@@ -99,7 +99,7 @@ Any user who wants to fetch producer's media stream needs to express interest wi
 %************************************************
 \subsubsection{Frame fetching}
 
-In order to understand principles underlying consumer protocol, let's analyze frame fetching process (see Figure \ref{fig:pull}). As was noted before, frames are made of several segments. This number of segments is not known beforehand, unless the very first segment is fetched - in this case, consumer can retrieve metadata from the received packet (see Table \ref{tab:meta}) and get total number of segments for current frame. Therefore, at first attempt, consumer tries to "guess" the number of segments she needs to fetch by issuing $M$ interests (see Figure \ref{fig:pull}). These interests can arrive to producer before request frame is published and stay in the cache for some amount of time $d_{gen}$ called \texttt{generation delay}. Once the frame is segmented into $N$ segments and these segments are published, interest $0 - M$ are answered with the data which travels back to consumer. Upon receiving first data segment, consumer retrieves metadata from received segment and determines total number of segments for current frame. In case if $N > M$, consumer issues more $N - M$ interests for missing segments. These segments will be satisfied with data with no generation delay. The time interval between receiving very first segment and until frame is fully assembled is represented by $d_{asm}$ and called \texttt{assembling time}.
+In order to understand principles underlying consumer protocol, let's analyze frame fetching process (see Figure \ref{fig:pull}). As was noted before, frames are made of several segments. This number of segments is not known beforehand, unless the very first segment is fetched - in this case, consumer can retrieve metadata from the received packet (see Table \ref{tab:meta}) and get total number of segments for current frame. Therefore, at first attempt, consumer tries to "guess" the number of segments she needs to fetch by issuing $M$ interests (see Figure \ref{fig:pull}). These interests can arrive to producer before requested frame is published and stay in the cache for some amount of time $d_{gen}$ called \texttt{generation delay}. Once the frame is segmented into $N$ segments and these segments are published, interest $0 - M$ are answered with the data which travels back to consumer. Upon receiving first data segment, consumer retrieves metadata from received segment and determines total number of segments for current frame. In case if $N > M$, consumer issues $N - M$ interests for missing segments. These segments will be satisfied with data with no generation delay (as the frame has been published already by producer). The time interval between receiving very first segment and until the frame is fully assembled is represented by $d_{asm}$ and called \texttt{assembling time}.
 
 \begin{figure}[Ht!]
 \centering
@@ -109,7 +109,7 @@ In order to understand principles underlying consumer protocol, let's analyze fr
 \end{figure}
 
 
-Clearly enough, consumer is interested in minimization of assembling time. First version of library was designed to have fixed amount of initial interests for all frame types. This caused problems, depicted on Figure \ref{fig:fetch-key}. Key frames are much larger than delta frames and this implies longer assembling times for key frames. However, consumer doesn't know what kind of frame she fetches next and experiments showed that quite often key frames did not have time enough to be assembled by the time they should be played back. This problem was solved by adding following considerations:
+Clearly enough, consumer is interested in minimization of assembling time. First version of library was designed to have fixed number of initial interests for all frame types. This caused problems, depicted on Figure \ref{fig:fetch-key}. Key frames are much larger than delta frames and this implies longer assembling times for key frames fetching. However, consumer doesn't know what kind of frame she fetches next and experiments showed that quite often key frames did not have time enough to be assembled by the time they should be played back. This problem was solved by adding following considerations:
 \begin{itemize}
 \item consumer should know what type of frame she is going to fetch;
 \item consumer should track average number of segments per frame type.
@@ -169,10 +169,40 @@ P \geq \overline{RTT} + \overline{d^{asm}}; J \geq \overline{RTT}
 \label{fig:buffer}
 \end{figure} 
 
-\subsubsection{Interest pipeline}
-One of the main goals for the consumer - express interests in proper time so that they can reach content store right before the requested data will become available. 
-Consider Figure \ref{fig:int-expression}: interests for the frame segments are issued with interval $d^{int}$, assembled frames arrive to the buffer with the interval $d^{arr}$. Consumer can adjust $d^{int}$ value in order to get recent data. By tracking values of $\overline{RTT^{F}_i}$ for the $i$-the frame and arrival delay $d^{arr}$, consumer can infer adjustments needed for $d^{int}$. 
-TBD
+\subsubsection{Fetching process}
+
+NDN provides data caching which helps distributing server loads. On the other side, in case of many-to-many real-time communications fetching fresh data may be critical. 
+Before consumer can start playing back received media, she has to ensure that she has got the latest data from the network, i.e. old cached content should not be presented to the user. Therefore, consumer operates in two modes: 
+\begin{itemize}
+\item chasing mode 
+\item fetching mode
+\end{itemize}
+
+\paragraph{Chasing mode}
+Consumer switches into chasing mode in two cases:
+\begin{enumerate}
+\item data fetching initiation
+\item no new data arrived for continuous time
+\end{enumerate}
+
+Consumer switches to fetching mode from chasing mode when she \textit{receives the latest data from the producer}. When consumer starts fetching data by issuing interests, it can get old data (up to \textit{freshness} seconds old) which is not useful anymore. In order to "chase" producer, consumer starts issuing interests with frequency, much higher than the frequency of data being produced (frames per second for video or sample rate for audio). After that, consumer monitors $d_{arr}$ - arrival delay of first segments for each frame and analyzes it value:
+\begin{equation}
+d_{arr} = \left\{\begin{matrix}
+growing \rightarrow \mbox{continue Chasing mode}\\ 
+stable \rightarrow \mbox{switch to Fetching mode}
+\end{matrix}\right.
+\end{equation}
+
+This decision is based on a simple idea: \textit{if interests are issued faster than the data is produced and the data arrives with data generation frequency, then interests are issued for the data that has not been produced yet}. Therefore, consumer is getting most recent data from the network. Figure \ref{fig:darr} shows how $d_{arr}$ grows over time in chasing mode.
+
+\begin{figure}[Ht!]
+\centering
+\includegraphics[width=0.5\textwidth]{darr}
+\caption{Data arrival delay $d_{arr}$ in chasing mode}
+\label{fig:darr}
+\end{figure} 
+
+\paragraph{Fetching mode}
 
 %\begin{figure}[Ht!]
 %\centering

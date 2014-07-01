@@ -34,7 +34,7 @@ TBD
 %************************************************
 \section{Architecture}
 There are two parties involved in RTC communication over NDN: producer and consumer. In presence of NDN network the paradigm of RTC shifts from the push-based (when producer writes data to the socket and consumer reads it as fast as possible) to the pull-based (producer publishes data on the network with his own pace, while consumer has to request the data he needs and manage incoming data segments).
-Producer's main task is to grab media data from media inputs, encode it, pack into network packets and store it in the cache for predefined data freshness period, after which data is removed from the cache.
+Producer's main task is to grab media data from media inputs, encode it, pack into network packets and store it in the cache for the predefined time interval (data freshness period), after which data is removed from the cache.
 Consumer implements more sophisticated algorithms for achieving following goals:
 \begin{itemize}
 \item ensure fetching the latest data from the network; 
@@ -70,7 +70,7 @@ As current NDN implementation works on top of the IP network, data chunks can no
 
 \paragraph{Consumer}
 
-Consumer takes into account that media packets are presented by separate segments in the network. Therefore, consumer implements mechanisms of interest pipeliner and frame buffer (see Figure \ref{fig:consumer}). Interest pipeliner issues interests for individual segments and is controlled by some higher-level logic for ensuring that only the latest data is fetched, thereby first out of three consumer's goals is achieved. Other two goals are attained by frame buffer which handles network latency by introducing some buffering delay and out-of-order packets arrival by organizing received frames in the proper order. 
+Consumer takes into account that media packets are presented by separate segments in the network. Therefore, consumer implements mechanisms of interest pipelining and frame buffering (see Figure \ref{fig:consumer}). Interest pipeliner issues interests for individual segments and is controlled by some higher-level logic which achieves one out of three consumer's goals and ensures that only the latest data is fetched. Other two goals are attained by the frame buffer which handles network latency by introducing some buffering delay and fixes out-of-order packets arrival by sorting received frames in the proper order. 
 
 \begin{figure}[Ht!]
 \centering
@@ -83,8 +83,9 @@ Consumer takes into account that media packets are presented by separate segment
 %************************************************
 \subsection{Namespace}
 
-Each user of NDN-RTC app is uniquely identified by a prefix URI which contains username (producer id on root level on the Figure \ref{fig:namespace}). A user publishes her media streams (audio or video) under streams namespace as presented in Figure \ref{fig:namespace}. Producer can publish one particular stream in several copies with different encoding parameters (for instance, to allow consumers fetch media stream wich is the most appropriate for current network conditions). The information about streams’ encoding parameters can be accessed by issuing interest in producer's \texttt{codec\_info} namespace (\textbf{/$<$user prefix$>$/streams/video0/vp8/codec\_info}).
-Any user who wants to fetch producer's media stream needs to express interest with URI corresponding to a certain media stream.
+Each user of NDN-RTC app is uniquely identified by a prefix URI which contains username (producer id on root level on the Figure \ref{fig:namespace}). A user publishes her media streams (audio or video) under streams namespace as presented in Figure \ref{fig:namespace}. Producer can publish one particular stream in several copies with different encoding parameters (for instance, to allow consumers fetch only that media stream wich is the most appropriate for current network conditions). The information about streams' encoding parameters can be accessed by issuing interest in producer's \texttt{codec\_info} namespace (\textbf{/$<$user prefix$>$/streams/video0/vp8/codec\_info}).
+Any user who wants to fetch producer's media stream needs to express interests with URI corresponding to a certain media stream. 
+Lower levels increase granularity of the data: streams are constituted by individual frames which are split into two types (\textit{Delta} and \textit{Key} frames) and numerated sequentially. Further data refinement level distinguishes between data types: actual frame data and parity data which is used for frames recovery and is optional for fetching.
 
 \begin{figure}[Ht!]
 \centering
@@ -99,13 +100,44 @@ Any user who wants to fetch producer's media stream needs to express interest wi
 %************************************************
 \subsubsection{Frame fetching}
 
-In order to understand principles underlying consumer protocol, let's analyze frame fetching process (see Figure \ref{fig:pull}). As was noted before, frames are made of several segments. This number of segments is not known beforehand, unless the very first segment is fetched - in this case, consumer can retrieve metadata from the received packet (see Table \ref{tab:meta}) and get total number of segments for current frame. Therefore, at first attempt, consumer tries to "guess" the number of segments she needs to fetch by issuing $M$ interests (see Figure \ref{fig:pull}). These interests can arrive to producer before requested frame is published and stay in the cache for some amount of time $d_{gen}$ called \texttt{generation delay}. Once the frame is segmented into $N$ segments and these segments are published, interest $0 - M$ are answered with the data which travels back to consumer. Upon receiving first data segment, consumer retrieves metadata from received segment and determines total number of segments for current frame. In case if $N > M$, consumer issues $N - M$ interests for missing segments. These segments will be satisfied with data with no generation delay (as the frame has been published already by producer). The time interval between receiving very first segment and until the frame is fully assembled is represented by $d_{asm}$ and called \texttt{assembling time}.
+In order to understand principles underlying consumer protocol, let's analyze frame fetching process (see Figure \ref{fig:pull}). As was noted before, frames are made of several segments (see Figure \ref{fig:segment}). Before frame can be segmented, it is transformed into a special data structure which besides frame data itself, carries meta information in its' header (see Figure \ref{fig:data-struct}) such as timestamps, current packet rate and media-specific information (frame size in case of video or sample type in case of audio - RTC or RTCP). After segmentation is done, each segment is appended by a segment header (see Figure \ref{fig:data-struct}) which contains segment-level specific meta info: 
+\begin{itemize}
+\item interest nonce - contains nonce of the first interest which requests this particular segment;
+\item interest arrival timestamp - timestamp of the interest arrival;
+\item generation delay - time interval in milliseconds between interest arrival and segment publishing.
+\end{itemize}
+Besides that, more meta information is stored in segment name and can be retrieved by consumer by analyzing data name components:
+\tiny\begin{equation}
+.../\textbf{frame\#}/data/\textbf{segment\#}/\textbf{playback\#}/\textbf{paired\_seq\#}/\textbf{num\_parity} \nonumber
+\end{equation}\normalsize
+\begin{itemize}
+\item \textit{playback\#} - absolute playback number for current frame; \textit{NOTE:} this is different from the \textit{frame\#} which is a sequential number for the frame in its' type domen (i.e. Key or Delta);
+\item \textit{paired\_seq\#} - sequential number of the frame from paired domen which somehow relates to the current frame (i.e. for delta frame, sequential number of the key frame which defines current GOP can be stored in this component);
+\item \textit{num\_parity} - number of parity segments for this frame.
+\end{itemize}
+
+The total number of segments is not known beforehand, unless the very first segment is fetched - in this case, consumer can retrieve metadata from the received segment and get total number of segments for current frame. 
+Therefore, at first attempt, consumer tries to "guess" the number of segments she needs to fetch by issuing $M$ interests (see Figure \ref{fig:pull}). These interests can arrive to producer before requested frame is published and stay in the cache for some amount of time $d_{gen}$ called \texttt{generation delay}. Once the frame is segmented into $N$ segments and these segments are published, interest $0 - M$ are answered with the data which travels back to consumer. Upon receiving first data segment, consumer retrieves metadata from received segment and determines total number of segments for current frame. In case if $N > M$, consumer issues $N - M$ interests for missing segments. These segments will be satisfied with data with no generation delay (as the frame has been published already by producer). The time interval between receiving very first segment and until the frame is fully assembled is represented by $d_{asm}$ and called \texttt{assembling time}.
 
 \begin{figure}[Ht!]
 \centering
 \includegraphics[width=0.5\textwidth]{frame-fetch}
 \caption{Fetching frame}
 \label{fig:pull}
+\end{figure}
+
+\begin{figure}[Ht!]
+\centering
+\includegraphics[width=0.5\textwidth]{segmentation}
+\caption{Frame segmentation}
+\label{fig:segment}
+\end{figure}
+
+\begin{figure}[Ht!]
+\centering
+\includegraphics[width=0.5\textwidth]{data-struct}
+\caption{Frame and segment headers}
+\label{fig:data-struct}
 \end{figure}
 
 

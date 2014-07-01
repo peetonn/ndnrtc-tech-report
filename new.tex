@@ -100,9 +100,9 @@ Lower levels increase granularity of the data: streams are constituted by indivi
 %************************************************
 \subsubsection{Frame fetching}
 
-In order to understand principles underlying consumer protocol, let's analyze frame fetching process (see Figure \ref{fig:pull}). As was noted before, frames are made of several segments (see Figure \ref{fig:segment}). Before frame can be segmented, it is transformed into a special data structure which besides frame data itself, carries meta information in its' header (see Figure \ref{fig:data-struct}) such as timestamps, current packet rate and media-specific information (frame size in case of video or sample type in case of audio - RTC or RTCP). After segmentation is done, each segment is appended by a segment header (see Figure \ref{fig:data-struct}) which contains segment-level specific meta info: 
+In order to understand principles underlying consumer protocol, let's analyze frame fetching process. As was noted before, frames are made of several segments (see Figure \ref{fig:segment}). Before frame can be segmented, it is transformed into a special data structure which besides frame data itself, carries meta information in its' header (see Figure \ref{fig:data-struct}) such as timestamps, current packet rate and media-specific information (frame size in case of video or sample type in case of audio - RTC or RTCP). After segmentation is done, each segment is appended by a segment header (see Figure \ref{fig:data-struct}) which contains segment-level specific meta info: 
 \begin{itemize}
-\item interest nonce - contains nonce of the first interest which requests this particular segment;
+\item interest nonce - contains nonce of the interest which requested this particular segment;
 \item interest arrival timestamp - timestamp of the interest arrival;
 \item generation delay - time interval in milliseconds between interest arrival and segment publishing.
 \end{itemize}
@@ -111,13 +111,13 @@ Besides that, more meta information is stored in segment name and can be retriev
 .../\textbf{frame\#}/data/\textbf{segment\#}/\textbf{playback\#}/\textbf{paired\_seq\#}/\textbf{num\_parity} \nonumber
 \end{equation}\normalsize
 \begin{itemize}
-\item \textit{playback\#} - absolute playback number for current frame; \textit{NOTE:} this is different from the \textit{frame\#} which is a sequential number for the frame in its' type domen (i.e. Key or Delta);
-\item \textit{paired\_seq\#} - sequential number of the frame from paired domen which somehow relates to the current frame (i.e. for delta frame, sequential number of the key frame which defines current GOP can be stored in this component);
+\item \textit{playback\#} - absolute playback number for current frame; \textit{NOTE:} this is different from the \textit{frame\#} which is a sequential number for the frame in its' type domain (i.e. Key or Delta);
+\item \textit{paired\_seq\#} - sequential number of the frame from paired domain which somehow relates to the current frame (i.e. for delta frame, sequential number of the key frame which defines current GOP can be stored in this component);
 \item \textit{num\_parity} - number of parity segments for this frame.
 \end{itemize}
 
 The total number of segments is not known beforehand, unless the very first segment is fetched - in this case, consumer can retrieve metadata from the received segment and get total number of segments for current frame. 
-Therefore, at first attempt, consumer tries to "guess" the number of segments she needs to fetch by issuing $M$ interests (see Figure \ref{fig:pull}). These interests can arrive to producer before requested frame is published and stay in the cache for some amount of time $d_{gen}$ called \texttt{generation delay}. Once the frame is segmented into $N$ segments and these segments are published, interest $0 - M$ are answered with the data which travels back to consumer. Upon receiving first data segment, consumer retrieves metadata from received segment and determines total number of segments for current frame. In case if $N > M$, consumer issues $N - M$ interests for missing segments. These segments will be satisfied with data with no generation delay (as the frame has been published already by producer). The time interval between receiving very first segment and until the frame is fully assembled is represented by $d_{asm}$ and called \texttt{assembling time}.
+Therefore, at first attempt, consumer tries to "guess" the number of segments she needs to fetch by issuing $M$ interests (see Figure \ref{fig:pull}). These interests can arrive to producer before requested frame is published and stay in the cache for some amount of time $d_{gen}$ called \texttt{generation delay}. Once the frame is segmented into $N$ segments and these segments are published, interests $0 - M$ are answered with the data which travels back to consumer. Upon receiving first data segment, consumer retrieves metadata from it and determines total number of segments for current frame. In case if $N > M$, consumer issues $N - M$ interests for missing segments. These segments will be satisfied with data with no generation delay (as the frame has been published already by producer). The time interval between receiving very first segment and until the frame is fully assembled is represented by $d_{asm}$ and called \texttt{assembling time}.
 
 \begin{figure}[Ht!]
 \centering
@@ -141,13 +141,13 @@ Therefore, at first attempt, consumer tries to "guess" the number of segments sh
 \end{figure}
 
 
-Clearly enough, consumer is interested in minimization of assembling time. First version of library was designed to have fixed number of initial interests for all frame types. This caused problems, depicted on Figure \ref{fig:fetch-key}. Key frames are much larger than delta frames and this implies longer assembling times for key frames fetching. However, consumer doesn't know what kind of frame she fetches next and experiments showed that quite often key frames did not have time enough to be assembled by the time they should be played back. This problem was solved by adding following considerations:
+Clearly enough, consumer is interested in minimization of the assembling time. First version of library was designed to have fixed number of initial interests for all frame types. This caused problems, explained by Figure \ref{fig:fetch-key}. Key frames are much larger than delta frames and this implies longer assembling times for key frames fetching. However, consumer doesn't know what kind of frame she fetches next and experiments showed that quite often key frames did not have enough time to be assembled by the time they should be played back. This problem was solved by adding following considerations:
 \begin{itemize}
 \item consumer should know what type of frame she is going to fetch;
 \item consumer should track average number of segments per frame type.
 \end{itemize}
 
-The first consideration was implemented by introducing separate namespaces for key and delta frames. The second consideration helps consumer make a "best guess" on number of initial interests to be issued in order to keep assembling time minimal.
+The first consideration was implemented by introducing separate namespaces for key and delta frames. The second consideration helps consumer make a "best guess" on a number of initial interests to be issued in order to keep assembling time minimal.
 
 \begin{figure}[Ht!]
 \centering
@@ -159,7 +159,7 @@ The first consideration was implemented by introducing separate namespaces for k
 
 \subsubsection{Bufferization}
 
-Pull-based one-to-many media data fetching results in different bufferization mechanisms for the consumer. Consumer should be aware that the data requested could not come earlier than the RTT value for the current network topology (see Figure \ref{fig:pull}), assuming that data has been already placed in the content store of forwarder by the time it received the interest. Moreover, RTT values can vary greatly (order of magnitude) depending on how far in the network interest should go (in case there are several hubs between consumer and producer). Clearly, consumer should be aware of this fact and take this into consideration while performing measurements. However for now, we assume that RTT values will not vary greatly.
+Pull-based one-to-many media data fetching results in different bufferization mechanisms for the consumer. Consumer should be aware that the data requested could not come earlier than the RTT value for the current network topology (see Figure \ref{fig:pull}), assuming that data has been already placed in the content store of a forwarder by the time it received the interest. Moreover, RTT values can vary greatly (order of magnitude) depending on how far in the network interest should go (in case there are several hubs between consumer and producer). Clearly, consumer should be aware of this fact and take this into consideration while performing measurements. However for now, we assume that RTT values will not vary greatly.
 
 Consumer is interested in getting the most recent data from the network. Taking into account RTT value, consumer should express interests in such a way, that they could arrive to the producer as close as possible to the frame publishing time $T^{pub}_{n}$. In general, RTT value for the $i$-th interest of the $N$-th frame can be expressed by the following equation:
 \begin{equation}
@@ -217,7 +217,7 @@ Consumer switches into chasing mode in two cases:
 \item no new data arrived for continuous time
 \end{enumerate}
 
-Consumer switches to fetching mode from chasing mode when she \textit{receives the latest data from the producer}. When consumer starts fetching data by issuing interests, it can get old data (up to \textit{freshness} seconds old) which is not useful anymore. In order to "chase" producer, consumer starts issuing interests with frequency, much higher than the frequency of data being produced (frames per second for video or sample rate for audio). After that, consumer monitors $d_{arr}$ - arrival delay of first segments for each frame and analyzes it value:
+Consumer switches to fetching mode from chasing mode when she \textit{receives the latest data from the producer}. When consumer starts fetching data by issuing interests, it can get old data (up to \textit{freshness} seconds old) which is not useful anymore. In order to "chase" producer, consumer starts issuing interests with frequency, much higher than the frequency of data being produced (frames per second for video or sample rate for audio). After that, consumer monitors $d_{arr}$ - arrival delay of first segments for each frame and analyzes this value:
 \begin{equation}
 d_{arr} = \left\{\begin{matrix}
 growing \rightarrow \mbox{continue Chasing mode}\\ 

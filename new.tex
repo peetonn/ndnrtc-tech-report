@@ -217,7 +217,7 @@ Consumer switches into chasing mode in two cases:
 \item no new data arrived for continuous time
 \end{enumerate}
 
-Consumer switches to fetching mode from chasing mode when she \textit{receives the latest data from the producer}. When consumer starts fetching data by issuing interests, it can get old data (up to \textit{freshness} seconds old) which is not useful anymore. In order to "chase" producer, consumer starts issuing interests with frequency, much higher than the frequency of data being produced (frames per second for video or sample rate for audio). After that, consumer monitors $d_{arr}$ - arrival delay of first segments for each frame and analyzes this value:
+Consumer stays in chasing mode unless she \textit{receives the latest data from the producer}. When consumer starts fetching data by issuing interests, it can get old data (up to \textit{freshness} seconds old) which is not useful anymore. In order to "chase" producer, consumer starts issuing interests with frequency, much higher than the frequency of data being produced (frames per second for video or sample rate for audio). After that, consumer monitors $d_{arr}$ - arrival delay of first segments for each frame and analyzes this value:
 \begin{equation}
 d_{arr} = \left\{\begin{matrix}
 growing \rightarrow \mbox{continue Chasing mode}\\ 
@@ -230,18 +230,13 @@ This decision is based on a simple idea: \textit{if interests are issued faster 
 \begin{figure}[Ht!]
 \centering
 \includegraphics[width=0.5\textwidth]{darr}
-\caption{Data arrival delay $d_{arr}$ in chasing mode}
+\caption{Data arrival delay $d_{arr}$ in chasing and fetching modes}
 \label{fig:darr}
 \end{figure} 
 
 \paragraph{Fetching mode}
 
-%\begin{figure}[Ht!]
-%\centering
-%\includegraphics[width=0.5\textwidth]{pipeliner}
-%\caption{Pipelining mechanism (TBD)}
-%\label{fig:pipeliner}
-%\end{figure} 
+Once consumer concluded that she receives the lates data, she switches into fetching mode. In this mode, consumer's main task is to keep frame buffer size at the minimal required level (as was explained in the previous section - at least 2*$RTT$ seconds). Therefore, interest pipelining mechanism is controlled by the buffer - whenever buffer size becomes less than minimal buffer size, new interests are expressed unless buffer size returns to the required level. Since frames from the buffer are consumed at the playback rate, pipeliner mechanism expresses interests at least at the same rate.
 
 \subsubsection{RTT estimation}
 TBD

@@ -1,0 +1,84 @@
+digraph ndnrtc { 
+	graph [dir=none, layout=dot, nodesep=0.2, margin=0, ranksep=0.3];
+	node [label="\N", shape=box];
+	edge [dir=none];
+		
+"/<root>/ndnrtc/user/<producer-id>/" -> streams;
+"/<root>/ndnrtc/user/<producer-id>/" -> info_codec;
+streams -> mic;
+mic [style=filled, fillcolor="#faffcd"]
+streams -> cam;
+cam [style=filled, fillcolor="#faffcd"]
+streams -> screen;
+screen [style=filled, fillcolor="#faffcd"]
+
+codec1 [label="low", style=filled, fillcolor="#5dba74"];
+codec2 [label="mid", style=filled, fillcolor="#5dba74"];
+codec3 [label="hi", style=filled, fillcolor="#5dba74"];
+
+root->empty [style="invis"]
+empty->stream [style="invis"]
+stream->bitrate [style="invis"]
+bitrate->encoding [style="invis"]
+encoding->packet_type [style="invis"]
+packet_type->packet [style="invis"]
+packet->data_type [style="invis"]
+data_type->segment [style="invis"]
+
+empty [style="invis"]
+root [shape=none, fontname="times-italic"]
+stream [shape=none , fontname="times-italic", label="media streams"]
+bitrate [shape=none, fontname="times-italic", label="media threads"]
+encoding [shape=none, fontname="times-italic", label=""]
+packet_type [shape=none, fontname="times-italic"]
+packet [shape=none, fontname="times-italic"]
+data_type [shape=none, fontname="times-italic"]
+segment [shape=none, fontname="times-italic"]
+
+cam -> codec1;
+cam -> codec2;
+cam -> codec3;
+
+acodec1 [label="pmcu", style=filled, fillcolor="#5dba74"];
+
+mic -> acodec1;
+# audio0 -> audio_info;
+# audio_info [label="stream_info"]
+
+codec2 -> frames;
+info_codec [label="session info"];
+# video0 -> info_codec;
+
+frames -> delta
+frames -> key
+
+f0 [label="0"];
+f1 [label="1"];
+f2 [label="..."];
+fN [label="N"];
+
+delta -> f0;
+delta -> f1;
+delta -> f2;
+delta -> fN;
+
+s0 [label="%00", style=filled, fillcolor="#c8c2ff"];
+s1 [label="%01", style=filled, fillcolor="#c8c2ff"];
+s2 [label="...", style=filled, fillcolor="#c8c2ff"];
+sM [label="%MM", style=filled, fillcolor="#c8c2ff"];
+
+f1 -> data
+f1 -> parity
+
+data -> s0;
+data -> s1;
+data -> s2;
+data -> sM
+
+p0 [label="%00", style=filled, fillcolor="#c8c2ff"];
+p1 [label="%01", style=filled, fillcolor="#c8c2ff"];
+
+parity -> p0;
+parity -> p1;
+
+}

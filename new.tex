@@ -44,7 +44,8 @@ Goals:
 %************************************************
 \section{Architecture}
 There are two main roles defined in NDN-RTC: producer and consumer. In presence of NDN network the paradigm of real-time communication shifts from the push-based (when producer writes data to the socket and consumer reads it as fast as possible) to the pull-based (producer publishes data on the network with his own pace, while consumer has to request the data he needs and manage incoming data segments).
-Producer's main task is to grab media data from media inputs, encode it, pack into network packets and store them in the cache. A lifetime for the data can be also defined by a producer (data freshness period).
+Producer's main task is to grab media data from media inputs, encode it, pack into network packets and store them in the cache. A lifetime for the data should be also defined by a producer (data freshness period).
+
 Consumer implements more sophisticated algorithms for achieving the following goals:
 \begin{itemize}
 \item ensure fetching the latest data from the network; 
@@ -121,7 +122,7 @@ NDN-RTC producer uses a concept of \textit{media stream} for describing publishe
 
 NDN-RTC does not use any specific media container format for delivering its media to consumers. Instead, encoded media packets are segmented if needed and published under distinctive hierarchical names. Video frames are separated into two domains as per frame type: \textit{delta} and \textit{key} and numbered sequentially and independently. Both sequence numbers for delta and key frames start from 0. Next level specializes data type - it can be either media data or parity. Parity data, if producer opts to publish it, can be used by consumer to recover frames that miss one or more segments. The topmost level of the namespace defines individual data segments. These segments are also numbered suquentially and segment numbers conform to NDN naming conventions \cite{ndn_naming}.
 
-There are some differences in case of the audio streams. First, there are no key frames, therefore all the audio packets are published under the \textit{delta} namespace. Second, audio samples are significantly smaller than video frames and do not require to be segmented. In practice, it appears that multiple audio sample can be bundled into one data segment. Therefore, instead of segmenting audio packets, they are bundled together until the size of one data segment is reached and published only after that.
+There are some differences in case of the audio streams. First, there are no key frames, therefore all the audio packets are published under the \textit{delta} namespace. Second, audio samples are significantly smaller than video frames and do not require to be segmented. In practice, it appears that multiple audio samples can be bundled into one data segment. Therefore, instead of segmenting audio packets, they are bundled together until the size of one data segment is reached and published only after that.
 
 Consumers need to know producer's streams structure in order to fetch data successfully. In order to save consumer from traversing actual producer's name tree, which can be time-consuming and unreliable, producer publishes meta information about her current streams under \textit{session info} component. Thus, consumers can retrieve up-to-date information about the producer's state.
 
@@ -132,7 +133,7 @@ Consumers need to know producer's streams structure in order to fetch data succe
 \label{fig:namespace}
 \end{figure}
 
-Besides naming data objects, data names can be appended by some additional media-level meta information which can be utlilized by consumers regardless of which frame segment was received first. Three components are added at the end of every data segment:
+Besides naming data objects, data names can be appended by some additional media-level meta information which can be utlilized by consumers regardless of which frame segment was received first. Three components are added at the end of every data segment name:
 \small\begin{equation}
 .../\textbf{segment\#}/\textbf{playback\#}/\textbf{paired\_seq\#}/\textbf{num\_parity} \nonumber
 \end{equation}\normalsize
@@ -145,9 +146,9 @@ Besides naming data objects, data names can be appended by some additional media
 
 %************************************************
 \subsection{Data objects}
-Producer generates signed data objects from input media streams and places them in cache instantly. Incoming interests retrieve data from cache, if it is present, or forwarded further to the producer, if the requested data has not been produced yet. In such cases, producer maintains a pending interests table (PIT) table, which is checked every time new data object is generated. If an interest for newly generated data object exists in the PIT, it gets answered and PIT entry is erased.
+Producer generates signed data objects from input media streams and places them in cache instantly. Incoming interests retrieve data from cache, if it is present, or forwarded further to the producer, if the requested data has not been produced yet. In such cases, producer maintains a pending interests table (PIT), which is checked every time new data object is generated. If an interest for newly generated data object exists in the PIT, it gets answered and PIT entry is erased.
 
-Besides actual stream data, data objects contain some ammount of meta information which is prepended during frames segmenting (see Figure \ref{fig:segment}). There are two types of headers: \textit{Frame header} and \textit{Segment header}. Frame header is prepended to segment \#0 of each individual video frame and contains media-specific information (such as size of a frame), timestamp, current rate and unix timestamp, which can be used for calculating actual delay between NTP-synchronized producer and consumers (see Figure \ref{fig:data-struct}). Segment header is prepended to every segment of a frame. It carries network-level information which can be used by consumer for making certain assumptions about current network conditions and origin of the data objects received:
+Besides actual stream data, data objects contain some amount of meta information which is prepended during frames segmenting (see Figure \ref{fig:segment}). There are two types of headers: \textit{Frame header} and \textit{Segment header}. Frame header is prepended to segment \#0 of each individual video frame and contains media-specific information (such as size of a frame), timestamp, current rate and unix timestamp, which can be used for calculating actual delay between NTP-synchronized producer and consumers (see Figure \ref{fig:data-struct}). Segment header is prepended to every segment of a frame. It carries network-level information which can be used by consumer for making certain assumptions about current network conditions and origin of the data objects received:
 \begin{itemize}
 \item Interest nonce
 
@@ -198,8 +199,8 @@ Audio samples are not prepended by any segment header, however the whole audio b
 %************************************************
 \subsubsection{Frame fetching}
 
-The total number of segments is not known beforehand, unless the very first segment is fetched - in this case, consumer can retrieve metadata from the received segment and get total number of segments for the current frame. 
-Therefore, at first attempt, consumer tries to "guess" the number of segments she needs to fetch by issuing $M$ interests (see Figure \ref{fig:pull}). These interests can arrive to producer before requested frame is published and stay in the cache for some amount of time $d_{gen}$ called \texttt{generation delay}. Once the frame is segmented into $N$ segments and these segments are published, interests $0 - M$ are answered with the data which travels back to consumer. Upon receiving first data segment, consumer retrieves metadata from it and determines total number of segments for current frame. In case if $N > M$, consumer issues $N - M$ interests for missing segments. These segments will be satisfied with data with no generation delay (as the frame has been published already by producer). The time interval between receiving very first segment and until the frame is fully assembled is represented by $d_{asm}$ and called \texttt{assembling time}.
+Consumer doesn't know the total number of segments beforehand, unless the very first segment is fetched - in this case, consumer can retrieve metadata from the received segment and get total number of segments for the current frame. 
+Therefore, at first attempt, consumer tries to make a "best guess" in the number of segments she needs to fetch by issuing $M$ interests (see Figure \ref{fig:pull}). If interests arrive too early, they will be added to the producer's PIT and stay there for some amount of time $d_{gen}$ called \texttt{generation delay}. Once encoded frame is segmented into $N$ segments and these segments are published, interests $0 - M$ are answered with the data which travels back to consumer. Upon receiving first data segment, consumer retrieves metadata from it and determines total number of segments for current frame. In case if $N > M$, consumer issues $N - M$ more interests for the missing segments. These segments will be satisfied by data with no generation delay (as the frame has been published already by producer). The time interval between receiving very first segment and until the frame is fully assembled is represented by $d_{asm}$ and called \texttt{assembling time}.
 
 \begin{figure}[Ht!]
 \centering
@@ -208,24 +209,29 @@ Therefore, at first attempt, consumer tries to "guess" the number of segments sh
 \label{fig:pull}
 \end{figure}
 
-Clearly enough, consumer is interested in minimizing assembling time. First version of library was designed to have fixed number of initial interests for all frame types. This caused problems, explained by Figure \ref{fig:fetch-key}. Key frames are much larger than delta frames and this implies longer assembling times for key frames fetching. However, consumer doesn't know what kind of frame she fetches next and experiments showed that quite often key frames did not have enough time to be assembled by the time they should be played back. This problem was solved by adding following considerations:
+It is needlesss to say, that additional round-trips for requesting missing data segments increase overall frame assembling time and chances that the frame will be incomplete by the time it should be played back. This problem could have been avoided if consumer could make a better guesses in the number of initial interests. Therefore, the following considerations were introduced in later versions of the library:
 \begin{itemize}
-\item consumer should know what type of frame she is going to fetch;
+\item consumer should know what type of frame she is going to fetch (as average number of segments varies greatly for different frame types);
 \item consumer should track average number of segments per frame type.
 \end{itemize}
 
-The first consideration was implemented by introducing separate namespaces for key and delta frames. The second consideration helps consumer make a "best guess" on a number of initial interests to be issued in order to keep assembling time minimal.
-
-\begin{figure}[Ht!]
-\centering
-\includegraphics[width=0.5\textwidth]{key-fetch}
-\caption{Fetching key frame}
-\label{fig:fetch-key}
-\end{figure}
-
+The first consideration was implemented by introducing separate namespaces for key and delta frames. The second consideration helps consumer do better at guessing the number of initial interests.
 
 \subsubsection{Bufferization}
-TBD
+
+% Buffer:
+% - re-ordering
+% - added latency to mitigate network delays
+% - extended defition:
+% 	- pending frames
+% 	- assembling frames
+% - buffer-based retransmissions
+
+As in traditional streaming applications, consumer uses frame bufferization in order to tackle out-of-order data arrivals and network delay deviations. Consumer-side jitter buffer is also used as a place for assembling frames by segments. However, the definition of jitter buffer is extended for NDN networks. In traditional push-based approach, buffer can not contain empty frame slots - they are allocated/reserved only when data arrives. Pull-based paradigm requires consumer to request data explicitly. Therefore an after expressing interest consumer "knows" that new data is coming and a frame slot should be reserved in the buffer. Practically, this means, that there will always be some number of empty reserved slots in the buffer. Therefore, jitter buffer's size have two measurements:
+\begin{itemize} 
+\item \textit{playback size} - playback duration of all complete ordered frames by the moment;
+\item \textit{estimated size} = \textit{playback size} + \textit{number of reserved slots} $\times$ 1/\textit{producer rate}
+\end{itemize}
 
 % Pull-based one-to-many media data fetching results in different bufferization mechanisms for the consumer. Consumer should be aware that the data requested could not come earlier than the RTT value for the current network topology (see Figure \ref{fig:pull}), assuming that data has been already placed in the content store of a forwarder by the time it received the interest. Moreover, RTT values can vary greatly (order of magnitude) depending on how far in the network interest should go (in case there are several hubs between consumer and producer). Clearly, consumer should be aware of this fact and take this into consideration while performing measurements. However for now, we assume that RTT values will not vary greatly.
 

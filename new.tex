@@ -227,94 +227,61 @@ The first consideration was implemented by introducing separate namespaces for k
 % 	- assembling frames
 % - buffer-based retransmissions
 
-As in traditional streaming applications, consumer uses frame bufferization in order to tackle out-of-order data arrivals and network delay deviations. Consumer-side jitter buffer is also used as a place for assembling frames by segments. However, the definition of jitter buffer is extended for NDN networks. In traditional push-based approach, buffer can not contain empty frame slots - they are allocated/reserved only when data arrives. Pull-based paradigm requires consumer to request data explicitly. Therefore an after expressing interest consumer "knows" that new data is coming and a frame slot should be reserved in the buffer. Practically, this means, that there will always be some number of empty reserved slots in the buffer. Therefore, jitter buffer's size have two measurements:
+As in traditional streaming applications, consumer uses frame bufferization in order to tackle out-of-order data arrivals and network delay deviations. Consumer-side jitter buffer is also used as a place for assembling frames by segments. However, the definition of jitter buffer is extended for NDN networks. In traditional push-based approach, buffer can not contain empty frame slots - they are allocated/reserved only when data arrives. Pull-based paradigm requires consumer to request data explicitly. Therefore, after expressing interest consumer "knows" that new data is coming and a frame slot should be reserved in the buffer. Practically, this means, that there will always be some number of empty reserved slots in the buffer. Thus, jitter buffer's size have two measurements:
 \begin{itemize} 
 \item \textit{playback size} - playback duration of all complete ordered frames by the moment;
 \item \textit{estimated size} = \textit{playback size} + \textit{number of reserved slots} $\times$ 1/\textit{producer rate}
 \end{itemize}
 
-% Pull-based one-to-many media data fetching results in different bufferization mechanisms for the consumer. Consumer should be aware that the data requested could not come earlier than the RTT value for the current network topology (see Figure \ref{fig:pull}), assuming that data has been already placed in the content store of a forwarder by the time it received the interest. Moreover, RTT values can vary greatly (order of magnitude) depending on how far in the network interest should go (in case there are several hubs between consumer and producer). Clearly, consumer should be aware of this fact and take this into consideration while performing measurements. However for now, we assume that RTT values will not vary greatly.
-
-% Consumer is interested in getting the most recent data from the network. Taking into account RTT value, consumer should express interests in such a way, that they could arrive to the producer as close as possible to the frame publishing time $T^{pub}_{n}$. In general, RTT value for the $i$-th interest of the $N$-th frame can be expressed by the following equation:
-% \begin{equation}
-% RTT_{ni} = t^{arr}_{ni} - t^{req}_{ni}
-% \end{equation}
-% where $t^{req}_{ni}$ - timestamp when the interest for $i$-th segment of $N$-th frame was expressed, $t^{arr}_{ni}$ - timestamp when the $i$-th data segment of $N$-th frame was received.
-
-% From the other point of view, RTT value can be represented like this:
-% \begin{equation}
-% RTT_{ni} = \widehat{RTT} + d^{gen}_{ni} + w_i
-% \end{equation}
-% where $\widehat{RTT}$ - real RTT value for the current network conditions, $d^{gen}_{ni}$ - delay between the moments when the interest has reached producer and requested data has been added to the content store, $w_i$ - network-introduced delay.
-% Whereas $w_i$ component cannot be omited entirely (though can be tracked), $d^{gen}$ is the variable that should be minimized by consumer in order to get the most accurate RTT estimation for the current network. 
-
-% Knowing RTT value is important for the consumer due to several reasons:
-
-% \begin{itemize}
-% \item consumer can estimate which fame number to request in order to get the latest data;
-% \item consumer can track segments arrival and set a deadline when a frame should be assembled and re-express interests for missing segments so that they can still arrive in time in order to finalize the frame.
-% \end{itemize} 
-
-% As network does not guarantee packet delivery, consumer should be aware of data losses and incorporate this knowledge in bufferization mechanisms. 
-
-% Proposed frame buffer is presented on Figure \ref{fig:buffer}. This is a circular buffer with frames being assembled while moving from the left side (beginning) to the right side (end) of the buffer. New frames (recently requested by issuing interests) enter buffer in the beginning of the buffer and exit in the end of the buffer. Further, we will analyse and measure different frame positions inside the buffer using time scale (milliseconds), i.e. if the buffer size is $B$ milliseconds, then the frame $F_n$ which should be played back at the time $t_n$ has entered the buffer at the time $t_n-B$.
-
-% In order to understand, how buffer size should be determined, let's apply reasoning, explained in next paragraph.
-
-% To handle data losses, buffer needs a retransmission check point at which interests for the missing frame segments can be re-expressed. This checkpoint should be placed far enough from the point when the frame should be played back so the missing data could arrive by this time. Any expressed interest is expected to bring data segment in $\overline{RTT}$ milliseconds (where $\overline{RTT}$ - consumer's estimation of the current RTT value). Therefore, retransmission checkpoint should be placed at least $\overline{RTT}$ milliseconds earlier before the end of the buffer (playback deadline). The same reasoning could be applied to determine a point in time at which initial interests should be expressed (i.e. beginning of the buffer). In ideal network conditions (with no losses), re-transmission of interests for missing segments should not be required, i.e.  frame should have been already assembled by the time of retransmission checkpoint. This means that the point of time for initial interests issuing should be placed $\overline{RTT}+\overline{d^{asm}}$ milliseconds earlier than retransmission checkpoint, where $\overline{d^{asm}}$ - is the observed average assembling time for this specific frame type (as it can vary greatly depending on frame type - Key or Delta). Therefore, according to the Figure \ref{fig:buffer}, the values of $P$ (pipeline size of the buffer) and $J$ (jitter size of the buffer) should satisfy these inequalities:
-
-% \begin{equation}
-% P \geq \overline{RTT} + \overline{d^{asm}}; J \geq \overline{RTT}
-% \end{equation}
-
-
-% \begin{figure}[Ht!]
-% \centering
-% \includegraphics[width=0.5\textwidth]{buffer}
-% \caption{Frame buffer}
-% \label{fig:buffer}
-% \end{figure} 
+The difference between estimated size and playback size ($RTT^{\prime}$) can't be smaller than the current average RTT value. In fact, keeping this value at a minimum indicates that consumer receives the most recent data with the minimal amount of outstanding interests. Monitoring this value over time may help consumer to get a clue on her "sync" status with the producer. For example, consumer may use it during bootstrapping process as will be discussed in the next section. 
 
 \subsubsection{Fetching process}
-TBD
 
-% NDN provides data caching which helps distributing server loads. On the other side, in case of many-to-many real-time communications fetching fresh data may be critical. 
-% Before consumer can start playing back received media, she has to ensure that she has got the latest data from the network, i.e. old cached content should not be presented to the user. Therefore, consumer operates in two modes: 
+For RTC applications it is critical to receive the most recent data from the network as well as to preserve it's caching ability for proper scaling. Consumer should not merely rely on using such flags as \textbf{AnswerOriginKind} and \textbf{RightMostChild}. The high frequency nature of streaming data makes no guarantees that the data satisfying those flags received by a consumer will be the most recent one. Instead, consumer should use other indicators to ensure that the network supplies up-to-date stream data. The fact that the media data is published with constant rate means that inter-arrival delays of the most recent samples repeat this publishing pattern. In contrast, cached data will follow interest expression pattern. Therefore, by monitoring inter-arrival delays of consequtive media samples, consumer can make assumptions about data freshness (see Figure \ref{fig:inter-arrival}).
+
+\begin{figure}[Ht!]
+\centering
+
+\subfigure[bursty cached data arrival, reflects interests expression pattern]{\label{fig:cached}\includegraphics[width=0.4\textwidth]{arrival-cached}}\\
+\subfigure[stable fresh data arrival, reflects publishing pattern]{\label{fig:fresh}\includegraphics[width=0.35\textwidth]{arrival-fresh}}
+
+\caption{Arrival patterns for the cached and most recent data}
+\label{fig:inter-arrival}
+\end{figure}
+
+During bootstrapping, consumer "chases" producer and aims to exhasut network cache. By incerasing the number of outstanding interests, consumer "pulls cached data" out of the network unless the freshest data start to arrive. After that, the number of outstanding interests may be decreased. 
+
+In order to control interest expresssion, a new concept of $W$ is introduced (see Figure \ref{fig:w-concept}). Consumer expresses interests only when $W > 0$. At every moment, $W$ indicates how many outstanding interests can be sent out. Before the bootstrapping phase, consumer initializes $W$ with some value. This value should reflect consumer's idea on how many interests are needed in order to exhaust network cache and reach the most recent data. Every time a new interest is expressed, $W$ gets decremented. When new data arrives, $W$ is incremented, thus allowing consumer to issue more interests. Hence, even though interest expression is data-driven, number of outstanding interests is controlled by a consumer.
+
+\begin{figure}[Ht!]
+\centering
+\includegraphics[width=0.5\textwidth]{w-concept}
+\caption{Interest expression control}
+\label{fig:w-concept}
+\end{figure}
+
+For more complex scenario of video streaming, consumer controls expression of "bulks" of interests rather than individual interests, as video frames are composed of several segments. In this case, $W$ is adjusted on per-frame basis, not per-segment. In all other respects, the same logic can be applied.
+
+
+\begin{figure}[Ht!]
+\centering
+\begin{tiny}
+\subfigure[window 4]{\def\svgwidth{0.5\textwidth}\input{w4.pdf_tex}}
+\subfigure[window 5]{\def\svgwidth{0.5\textwidth}\input{w5.pdf_tex}}
+\end{tiny}
+
+\caption{Window 5}
+\label{fig:w5}
+\end{figure}
+
 % \begin{itemize}
-% \item chasing mode 
-% \item fetching mode
+% \item cached data on the network
+% \item main cache data indicatior - inter-arrival delays
+% \item increasing the number of outstanding interests helps exhaust network cache
+% \item changes in $RTT^{\prime}$ react to changes in the number of outstanding interests
+% \item $RTT^{\prime}$ hits minimum for the cached data
+% \item interests are issued in bursts - per frame
 % \end{itemize}
-
-% \paragraph{Chasing mode}
-% Consumer switches into chasing mode in two cases:
-% \begin{enumerate}
-% \item data fetching initiation
-% \item no new data arrived for continuous time
-% \end{enumerate}
-
-% Consumer stays in chasing mode unless she \textit{receives the latest data from the producer}. When consumer starts fetching data by issuing interests, it can get old data (up to \textit{freshness} seconds old) which is not useful anymore. In order to "chase" producer, consumer starts issuing interests with frequency, much higher than the frequency of data being produced (frames per second for video or sample rate for audio). After that, consumer monitors $d_{arr}$ - arrival delay of first segments for each frame and analyzes this value:
-% \begin{equation}
-% d_{arr} = \left\{\begin{matrix}
-% growing \rightarrow \mbox{continue Chasing mode}\\ 
-% stable \rightarrow \mbox{switch to Fetching mode}
-% \end{matrix}\right.
-% \end{equation}
-
-% This decision is based on a simple idea: \textit{if interests are issued faster than the data is produced and the data arrives with data generation frequency, then interests are issued for the data that has not been produced yet}. Therefore, consumer is getting most recent data from the network. Figure \ref{fig:darr} shows how $d_{arr}$ grows over time in chasing mode.
-
-% \begin{figure}[Ht!]
-% \centering
-% \includegraphics[width=0.5\textwidth]{darr}
-% \caption{Data arrival delay $d_{arr}$ in chasing and fetching modes}
-% \label{fig:darr}
-% \end{figure} 
-
-% \paragraph{Fetching mode}
-
-% Once consumer concluded that she receives the lates data, she switches into fetching mode. In this mode, consumer's main task is to keep frame buffer size at the minimal required level (as was explained in the previous section - at least 2*$RTT$ seconds). Therefore, interest pipelining mechanism is controlled by the buffer - whenever buffer size becomes less than minimal buffer size, new interests are expressed unless buffer size returns to the required level. Since frames from the buffer are consumed at the playback rate, pipeliner mechanism expresses interests at least at the same rate.
-
-% \subsubsection{RTT estimation}
-% TBD
 
 \section{Implementation}
 TBD

@@ -36,7 +36,7 @@
   }%
   \providecommand\rotatebox[2]{#2}%
   \ifx\svgwidth\undefined%
-    \setlength{\unitlength}{1152bp}%
+    \setlength{\unitlength}{1034.32255859bp}%
     \ifx\svgscale\undefined%
       \relax%
     \else%
@@ -48,25 +48,25 @@
   \global\let\svgwidth\undefined%
   \global\let\svgscale\undefined%
   \makeatother%
-  \begin{picture}(1,0.44722222)%
+  \begin{picture}(1,0.3886085)%
     \put(0,0){\includegraphics[width=\unitlength,page=1]{w4.pdf}}%
-    \put(0.24541115,0.06902779){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[b]{\smash{1000}}}%
-    \put(0.37468906,0.06902779){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[b]{\smash{2000}}}%
-    \put(0.50396699,0.06902779){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[b]{\smash{3000}}}%
-    \put(0.63324492,0.06902779){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[b]{\smash{4000}}}%
-    \put(0.76252289,0.06902779){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[b]{\smash{5000}}}%
-    \put(0.14513889,0.08187502){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[rb]{\smash{0}}}%
-    \put(0.14513889,0.15079861){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[rb]{\smash{30}}}%
-    \put(0.14513889,0.21972222){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[rb]{\smash{60}}}%
-    \put(0.14513889,0.28864583){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[rb]{\smash{90}}}%
-    \put(0.14513889,0.35756944){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[rb]{\smash{120}}}%
-    \put(0,0){\includegraphics[width=\unitlength,page=2]{w4.pdf}}%
-    \put(0.17152778,0.34541666){\color[rgb]{0.13333333,0.13333333,0.13333333}\makebox(0,0)[lb]{\smash{Darr}}}%
-    \put(0.17152778,0.34541666){\color[rgb]{0.13333333,0.13333333,0.13333333}\makebox(0,0)[lb]{\smash{Darr}}}%
-    \put(0,0){\includegraphics[width=\unitlength,page=3]{w4.pdf}}%
-    \put(0.22638889,0.34541666){\color[rgb]{0.13333333,0.13333333,0.13333333}\makebox(0,0)[lb]{\smash{Fresh}}}%
-    \put(0.22638889,0.34541666){\color[rgb]{0.13333333,0.13333333,0.13333333}\makebox(0,0)[lb]{\smash{Fresh}}}%
-    \put(0,0){\includegraphics[width=\unitlength,page=4]{w4.pdf}}%
-    \put(0.50034722,0.02979168){\color[rgb]{0.13333333,0.13333333,0.13333333}\makebox(0,0)[b]{\smash{\textit{Time}}}}%
+    \put(0.21516281,0.04417524){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[b]{\smash{1000}}}%
+    \put(0.35914899,0.04417524){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[b]{\smash{2000}}}%
+    \put(0.50313518,0.04417524){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[b]{\smash{3000}}}%
+    \put(0.64712138,0.04417524){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[b]{\smash{4000}}}%
+    \put(0.79110763,0.04417524){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[b]{\smash{5000}}}%
+    \put(0.10348232,0.06467174){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[rb]{\smash{0}}}%
+    \put(0.10348232,0.14143694){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[rb]{\smash{30}}}%
+    \put(0.10348232,0.21820216){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[rb]{\smash{60}}}%
+    \put(0.10348232,0.29496738){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[rb]{\smash{90}}}%
+    \put(0.10348232,0.3717326){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[rb]{\smash{120}}}%
+    \put(0.89472485,0.06467174){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[lb]{\smash{0}}}%
+    \put(0.89472485,0.14143694){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[lb]{\smash{40}}}%
+    \put(0.89472485,0.21820216){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[lb]{\smash{80}}}%
+    \put(0.89472485,0.29496738){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[lb]{\smash{120}}}%
+    \put(0.89472485,0.3717326){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[lb]{\smash{160}}}%
+    \put(0.49910359,0.00666276){\color[rgb]{0.13333333,0.13333333,0.13333333}\makebox(0,0)[b]{\smash{\textit{Time (ms)}}}}%
+    \put(0.01654619,0.2225335){\color[rgb]{0.13333333,0.13333333,0.13333333}\rotatebox{90}{\makebox(0,0)[b]{\smash{\textit{$D_{arr}$ (ms)}}}}}%
+    \put(0.98993693,0.22253349){\color[rgb]{0.13333333,0.13333333,0.13333333}\rotatebox{90}{\makebox(0,0)[b]{\smash{\textit{$RTT^\prime$ (ms)}}}}}%
   \end{picture}%
 \endgroup%

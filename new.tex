@@ -8,6 +8,11 @@
 \usepackage{hyperref}   % use for hypertext links, including those to external documents and URLs
 \usepackage{multicol}
 \usepackage{textcomp}
+\usepackage{caption}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+% \usepackage{float}
+% \newfloat{algorithm}{t}{lop}
 
 \author{P.~Gusev, J.~Burke}
 \title{NDN-RTC Technical Report (draft)}
@@ -54,7 +59,7 @@ Consumer implements more sophisticated algorithms for achieving the following go
 \item handle network latency and packet drops.
 \end{itemize}
 
-\begin{figure}[Ht!]
+\begin{figure}[t!]
 \centering
 \includegraphics[width=0.5\textwidth]{architecture}
 \caption{RTC over NDN}
@@ -75,7 +80,7 @@ Encoded frames vary in size, but average bitrate stays the same. For example, th
 
 Therefore, depending on the underlying internet protocol used (IP in the existing NDN testbed), producer may need to segment encoded frames into a smaller chunks and provide clear naming conventions for consumer to fetch them (see Figure \ref{fig:producer}).
 
-\begin{figure}[Ht!]
+\begin{figure}[t!]
 \centering
 \includegraphics[width=0.5\textwidth]{producer}
 \caption{NDN-RTC producer}
@@ -86,7 +91,7 @@ Therefore, depending on the underlying internet protocol used (IP in the existin
 
 Consumer takes into account that media packets are presented by separate segments in the network. Therefore, consumer implements mechanisms of interest pipelining and frame buffering (see Figure \ref{fig:consumer}). Interest pipeliner issues interests for individual segments and is controlled by some higher-level logic which achieves one out of four consumer's goals - ensures that only the latest data is fetched. Packets re-ordering, drops and latency fluctuations absorbtion are attained by the frame buffer which introduces buffering delay and arranges received frames in the playback order.
 
-\begin{figure}[Ht!]
+\begin{figure}[t!]
 \centering
 \includegraphics[width=0.5\textwidth]{consumer}
 \caption{NDN-RTC consumer}
@@ -113,7 +118,7 @@ Besides that, the namespace should also reflect data specialization hierarchy - 
 
 NDN-RTC producer uses a concept of \textit{media stream} for describing published media. Media stream represents a flow of raw media packets (video frames or audio samples) coming from an input device. Streams usually derive names from their input devices. It is quite natural for a producer to publish several media streams simultaneously, if she has more than one device to publish media from (for instance, publish video from camera, audio from microphone and another video stream for sharing computer screen). As all raw data should be encoded, the next level in the name hierarchy represents different encoder instances called \textit{media threads}. Thus, media threads allow producer to provide same media stream in several copies, for instance in low, medium and high quality for video, so that consumer can have a chance to choose media thread more suitable for the current network conditions.
 
-\begin{figure}[Ht!]
+\begin{figure}[t!]
 \centering
 \includegraphics[width=0.5\textwidth]{streams-hierarchy}
 \caption{NDN-RTC media streams hierarchy}
@@ -126,7 +131,7 @@ There are some differences in case of the audio streams. First, there are no key
 
 Consumers need to know producer's streams structure in order to fetch data successfully. In order to save consumer from traversing actual producer's name tree, which can be time-consuming and unreliable, producer publishes meta information about her current streams under \textit{session info} component. Thus, consumers can retrieve up-to-date information about the producer's state.
 
-\begin{figure}[Ht!]
+\begin{figure}[t!]
 \centering
 \includegraphics[width=0.5\textwidth]{namespace}
 \caption{NDN-RTC namespace}
@@ -147,6 +152,16 @@ Besides naming data objects, data names can be appended by some additional media
 %************************************************
 \subsection{Data objects}
 Producer generates signed data objects from input media streams and places them in cache instantly. Incoming interests retrieve data from cache, if it is present, or forwarded further to the producer, if the requested data has not been produced yet. In such cases, producer maintains a pending interests table (PIT), which is checked every time new data object is generated. If an interest for newly generated data object exists in the PIT, it gets answered and PIT entry is erased.
+
+\begin{figure}[t!]
+\centering
+
+\subfigure[video frame segmentation]{\label{fig:segment}\includegraphics[width=0.5\textwidth]{segmentation}}
+\subfigure[audio samples bundling]{\label{fig:audio-bundling}\includegraphics[width=0.3\textwidth]{audio-bundling}}
+
+\caption{Segmentation and bundling}
+
+\end{figure}
 
 Besides actual stream data, data objects contain some amount of meta information which is prepended during frames segmenting (see Figure \ref{fig:segment}). There are two types of headers: \textit{Frame header} and \textit{Segment header}. Frame header is prepended to segment \#0 of each individual video frame and contains media-specific information (such as size of a frame), timestamp, current rate and unix timestamp, which can be used for calculating actual delay between NTP-synchronized producer and consumers (see Figure \ref{fig:data-struct}). Segment header is prepended to every segment of a frame. It carries network-level information which can be used by consumer for making certain assumptions about current network conditions and origin of the data objects received:
 \begin{itemize}
@@ -169,14 +184,7 @@ Time interval in milliseconds between interest arrival and segment publishing. C
 
 \end{itemize}
 
-\begin{figure}[Ht!]
-\centering
-\includegraphics[width=0.5\textwidth]{segmentation}
-\caption{Frame segmentation}
-\label{fig:segment}
-\end{figure}
-
-\begin{figure}[Ht!]
+\begin{figure}[t!]
 \centering
 \includegraphics[width=0.3\textwidth]{data-struct}
 \caption{Frame and segment headers}
@@ -184,14 +192,6 @@ Time interval in milliseconds between interest arrival and segment publishing. C
 \end{figure}
 
 Audio samples are not prepended by any segment header, however the whole audio bundle is prepended by the same frame header (see Figure \ref{fig:audio-bundling}).
-
-\begin{figure}[Ht!]
-\centering
-\includegraphics[width=0.3\textwidth]{audio-bundling}
-\caption{Audio bundling}
-\label{fig:audio-bundling}
-\end{figure}
-
 
 %************************************************
 \subsection{Consumer protocol}
@@ -202,7 +202,7 @@ Audio samples are not prepended by any segment header, however the whole audio b
 Consumer doesn't know the total number of segments beforehand, unless the very first segment is fetched - in this case, consumer can retrieve metadata from the received segment and get total number of segments for the current frame. 
 Therefore, at first attempt, consumer tries to make a "best guess" in the number of segments she needs to fetch by issuing $M$ interests (see Figure \ref{fig:pull}). If interests arrive too early, they will be added to the producer's PIT and stay there for some amount of time $d_{gen}$ called \texttt{generation delay}. Once encoded frame is segmented into $N$ segments and these segments are published, interests $0 - M$ are answered with the data which travels back to consumer. Upon receiving first data segment, consumer retrieves metadata from it and determines total number of segments for current frame. In case if $N > M$, consumer issues $N - M$ more interests for the missing segments. These segments will be satisfied by data with no generation delay (as the frame has been published already by producer). The time interval between receiving very first segment and until the frame is fully assembled is represented by $d_{asm}$ and called \texttt{assembling time}.
 
-\begin{figure}[Ht!]
+\begin{figure}[t!]
 \centering
 \includegraphics[width=0.5\textwidth]{frame-fetch}
 \caption{Fetching frame}
@@ -233,13 +233,13 @@ As in traditional streaming applications, consumer uses frame bufferization in o
 \item \textit{estimated size} = \textit{playback size} + \textit{number of reserved slots} $\times$ 1/\textit{producer rate}
 \end{itemize}
 
-The difference between estimated size and playback size ($RTT^{\prime}$) can't be smaller than the current average RTT value. In fact, keeping this value at a minimum indicates that consumer receives the most recent data with the minimal amount of outstanding interests. Monitoring this value over time may help consumer to get a clue on her "sync" status with the producer. For example, consumer may use it during bootstrapping process as will be discussed in the next section. 
+The difference between estimated size and playback size ($RTT^{\prime}$) can't be smaller than the current average RTT value. In fact, keeping this value at a minimum indicates that consumer receives the most recent data with the minimal amount of outstanding interests. Monitoring this value over time may help consumer to get a clue on her "sync" status with the producer. For example, consumer may use it during fetching process as will be discussed in the next section. 
 
 \subsubsection{Fetching process}
 
-For RTC applications it is critical to receive the most recent data from the network as well as to preserve it's caching ability for proper scaling. Consumer should not merely rely on using such flags as \textbf{AnswerOriginKind} and \textbf{RightMostChild}. The high frequency nature of streaming data makes no guarantees that the data satisfying those flags received by a consumer will be the most recent one. Instead, consumer should use other indicators to ensure that the network supplies up-to-date stream data. The fact that the media data is published with constant rate means that inter-arrival delays of the most recent samples repeat this publishing pattern. In contrast, cached data will follow interest expression pattern. Therefore, by monitoring inter-arrival delays of consequtive media samples, consumer can make assumptions about data freshness (see Figure \ref{fig:inter-arrival}).
+For RTC applications it is critical to receive the most recent data from the network as well as to preserve it's caching ability for proper scaling. Consumer should not merely rely on using such flags as \textit{AnswerOriginKind} and \textit{RightMostChild}. The high frequency nature of streaming data makes no guarantees that the data satisfying those flags received by a consumer will be the most recent one. Instead, consumer should use other indicators to ensure that the network supplies up-to-date stream data. The fact that the media data is published with constant rate means that inter-arrival delays ($D_{arr}$) of the most recent samples repeat this publishing pattern. In contrast, cached data will follow interest expression pattern. Therefore, by monitoring inter-arrival delays of consequtive media samples, consumer can make assumptions about data freshness (see Figure \ref{fig:inter-arrival}).
 
-\begin{figure}[Ht!]
+\begin{figure}[t!]
 \centering
 
 \subfigure[bursty cached data arrival, reflects interests expression pattern]{\label{fig:cached}\includegraphics[width=0.4\textwidth]{arrival-cached}}\\
@@ -251,37 +251,83 @@ For RTC applications it is critical to receive the most recent data from the net
 
 During bootstrapping, consumer "chases" producer and aims to exhasut network cache. By incerasing the number of outstanding interests, consumer "pulls cached data" out of the network unless the freshest data start to arrive. After that, the number of outstanding interests may be decreased. 
 
-In order to control interest expresssion, a new concept of $W$ is introduced (see Figure \ref{fig:w-concept}). Consumer expresses interests only when $W > 0$. At every moment, $W$ indicates how many outstanding interests can be sent out. Before the bootstrapping phase, consumer initializes $W$ with some value. This value should reflect consumer's idea on how many interests are needed in order to exhaust network cache and reach the most recent data. Every time a new interest is expressed, $W$ gets decremented. When new data arrives, $W$ is incremented, thus allowing consumer to issue more interests. Hence, even though interest expression is data-driven, number of outstanding interests is controlled by a consumer.
+In order to control interest expresssion, a concept of $W$ is introduced (see Figure \ref{fig:w-concept}). Consumer expresses interests only when $W > 0$. At every moment, $W$ indicates how many outstanding interests can be sent out. Before the bootstrapping phase, consumer initializes $W$ with some value. This value should reflect consumer's idea on how many interests are needed in order to exhaust network cache and reach the most recent data (Figure \ref{fig:ws} shows how bigger value of $W$ helps to exhaust cache faster). Every time a new interest is expressed, $W$ gets decremented. When new data arrives, $W$ is incremented, thus allowing consumer to issue more interests. Hence, even though interest expression is data-driven, number of outstanding interests is controlled by a consumer and directly influences how fast consumer can "chase" producer.
 
-\begin{figure}[Ht!]
+\begin{figure}[t!]
 \centering
-\includegraphics[width=0.5\textwidth]{w-concept}
+
+\subfigure[$W$ concept]{\includegraphics[width=0.35\textwidth]{w-concept}}
+\subfigure[interests bursting ($W+3$)]{\label{fig:int-burst}\includegraphics[width=0.35\textwidth]{int-burst}}
+\subfigure[interests withholding ($W-3$)]{\label{fig:int-hold}\includegraphics[width=0.35\textwidth]{int-hold}}
+
 \caption{Interest expression control}
 \label{fig:w-concept}
 \end{figure}
 
-For more complex scenario of video streaming, consumer controls expression of "bulks" of interests rather than individual interests, as video frames are composed of several segments. In this case, $W$ is adjusted on per-frame basis, not per-segment. In all other respects, the same logic can be applied.
-
-
-\begin{figure}[Ht!]
+\begin{figure}[t!]
 \centering
-\begin{tiny}
-\subfigure[window 4]{\def\svgwidth{0.5\textwidth}\input{w4.pdf_tex}}
-\subfigure[window 5]{\def\svgwidth{0.5\textwidth}\input{w5.pdf_tex}}
-\end{tiny}
-
-\caption{Window 5}
-\label{fig:w5}
+%\captionsetup[subfigure]{aboveskip=-1pt,belowskip=-2pt}
+\begin{scriptsize}
+\subfigure[$W=10$: short chasing, bigger $RTT^\prime$]{\def\svgwidth{0.48\textwidth}\input{w10.pdf_tex}}
+\subfigure[$W=4$: longer chasing, smaller $RTT^\prime$]{\def\svgwidth{0.48\textwidth}\input{w4.pdf_tex}}
+\subfigure[$W=3$: consumer can't exhasut cache, $RTT^\prime = RTT$]{\def\svgwidth{0.48\textwidth}\input{w3.pdf_tex}}
+\end{scriptsize}
+\caption{Bigger $W$ decreases "chasing" phase, but increases $RTT^\prime$ for the same network configuration ($RTT\approx100ms$)}
+\label{fig:ws}
 \end{figure}
 
-% \begin{itemize}
-% \item cached data on the network
-% \item main cache data indicatior - inter-arrival delays
-% \item increasing the number of outstanding interests helps exhaust network cache
-% \item changes in $RTT^{\prime}$ react to changes in the number of outstanding interests
-% \item $RTT^{\prime}$ hits minimum for the cached data
-% \item interests are issued in bursts - per frame
-% \end{itemize}
+$W$ provides a simple mechanism which can be used to speed up or slow down interests expression. Any increase in $W$ value makes consumer to issue more interests (Figure \ref{fig:int-burst}), whereas decrease in $W$ holds consumer back from sending any new interests (Figure \ref{fig:int-hold}). Bigger values of $W$ makes consumer faster reach synchronized state with producer. However, larger value means larger number of outstanding interests and bigger $RTT^\prime$ because of longer generation delays $d_{gen}$ for each media sample. By adjusting the value of $W$ and observing inter-arrival delays $D_{arr}$ consumer can find minimal $RTT^\prime$ value while still getting non-cached data, thus achieving best synchronization state with producer.
+
+For more complex scenario of video streaming, consumer controls expression of "bulks" of interests instead of individual interests, because video frames are composed of several segments. In this case, $W$ is adjusted on per-frame basis, rather than per-segment. In all other respects, the same above logic can be applied.
+
+Bootstrapping phase starts with issuing interest with enabled \textit{RightMostChild} selector in delta namespace for audio and key namespace for video. The reason, why this process differs for video streams is that consumer is not interested in fetching delta frames without having corresponding key frame for decoding. Once initial data segment of sample with number $S_{seed}$ has been received, consumer initializes $W$ with some initial value $N$ and asks for the next sample data $S_{seed}+1$ in the appropriate namespace. Upon receiveing first segments of sample $S_{seed}+1$, consumer initiates fetching process described above for all namespaces (delta and key, if available). Bootstrapping phase stops when consumer finds minimal value of $W$ which still allows receiving the most recent data - i.e. consumer reaches synchronized state with producer and switches to a normal fetching phase where no adjustments for $W$ are needed. 
+% Listing \ref{lst:fetch-algo} shows pseudo-code for the bootstrapping phase.
+
+% \begin{algorithm}
+% \begin{algorithmic}
+
+% \Function{Bootstrap}{Meta}
+
+% \If {audio}
+% 	\State $Nspc \gets DeltaNamespace$
+% \Else
+% 	\State $Nspc \gets KeyNamespace$
+% \EndIf
+
+% \State \Call{ExpressOne}{$RightMostChild$, $Nspc$}
+% \Ensure Received data segment $Dseed$
+% \State $Sseed \gets$\Call{GetSeqNumber}{$Dseed$}
+% \State $NavgKey \gets$\Call{GetAvgSegNum}{$Meta$, $Key$}
+% \State \Call{ExpressBulk}{$NavgKey$, $Sseed+1$, $Nspc$}
+% \Ensure Received data segment $D$ for $Sseed+1$
+% \State $J \gets$ \Call{GetDeltaNumber}{$D$}
+% \State $NavgDelta \gets$\Call{GetAvgSegNum}{$Meta$, $Delta$}
+% \State $DW \gets N$
+% \State $W \gets DW$
+
+% \While{$BootstrappingPhase$}
+
+% \While{$W > 0$}
+% 	\State \Call{ExpressBulk}{$NavgDelta$, $J$, $Delta$}
+% 	\State $W \gets W-1$
+% 	\State $J \gets J+1$
+% \EndWhile
+
+% \If {received segment $Dj$ for new sample}
+% 	\State $W \gets W+1$
+% \EndIf
+
+% \EndWhile
+
+% \State \Call{Switch}{$FetchingPhase$}
+
+% \EndFunction
+
+% \end{algorithmic}
+
+% \label{lst:fetch-algo}
+% \caption{Bootstrap}
+% \end{algorithm}
 
 \section{Implementation}
 TBD

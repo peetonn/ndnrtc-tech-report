@@ -51,10 +51,10 @@ Goals:
 There are two main roles defined in NDN-RTC: producer and consumer. In presence of NDN network the paradigm of real-time communication shifts from the push-based (when producer writes data to the socket and consumer reads it as fast as possible) to the pull-based (producer publishes data on the network with his own pace, while consumer has to request the data he needs and manage incoming data segments).
 Producer's main task is to grab media data from media inputs, encode it, pack into network packets and store them in the cache. A lifetime for the data should be also defined by a producer (data freshness period).
 
-Consumer implements more sophisticated algorithms for achieving the following goals:
+Consumer implements more sophisticated algorithms to achieve following goals:
 \begin{itemize}
-\item ensure fetching the latest data from the network; 
-\item monitor network conditions and choose appropriate bandwith from a selection provided by a producer;  
+\item ensure fetching the latest data available in the network; 
+\item choose appropriate media stream bandwiths provided by a producer by monitoring network conditions;
 \item playback fetched media in correct order;
 \item handle network latency and packet drops.
 \end{itemize}
@@ -70,9 +70,9 @@ Figure \ref{fig:arc} presents top-level overview of how NDN-RTC works. Local med
 
 \paragraph{Producer}
 
-In case of video streaming, producer uses video encoding in order to reduce size of the frames. There are two types of frames used for encoding: \textit{Key} frames and \textit{Delta} frames. Key frames contain the most of the video information and don't depend on any previous frames to be decoded. Whereas Delta frames are dependent on all previous frames received after the last Key frame and can't be decoded without significant visual artifacts if any of those frames are missing.
+In case of video streaming, producer uses video encoding in order to reduce size of the frames. There are two types of encoded frames: \textit{Key} and \textit{Delta}. Key frames contain the most of the video information and don't depend on any previous frames to be decoded. Whereas Delta frames are dependent on all previous frames received after the last Key frame and can't be decoded without significant visual artifacts if any of those frames are missing.
 
-Encoded frames vary in size, but average bitrate stays the same. For example, these are the sizes of frames for 1000 kbps stream:
+Encoded frames vary in size, but average bitrate stays the same. For example, these are the average sizes of frames for 1000 kbps stream:
 \begin{itemize}
 \item \textbf{Key frames} $\approx$ 30KB;
 \item \textbf{Delta frames} $\approx$ 3-7KB.
@@ -89,7 +89,7 @@ Therefore, depending on the underlying internet protocol used (IP in the existin
 
 \paragraph{Consumer}
 
-Consumer takes into account that media packets are presented by separate segments in the network. Therefore, consumer implements mechanisms of interest pipelining and frame buffering (see Figure \ref{fig:consumer}). Interest pipeliner issues interests for individual segments and is controlled by some higher-level logic which achieves one out of four consumer's goals - ensures that only the latest data is fetched. Packets re-ordering, drops and latency fluctuations absorbtion are attained by the frame buffer which introduces buffering delay and arranges received frames in the playback order.
+Consumer takes into account that media packets are presented by separate segments in the network. Therefore, consumer implements mechanisms of interest pipelining and frame buffering (see Figure \ref{fig:consumer}). Interest pipeliner issues interests for individual segments and is controlled by some higher-level logic which achieves one out of four consumer's goals - ensures that only the latest data is fetched. Packets re-ordering, drops and latency fluctuations absorbtion are attained by the frame buffer which introduces buffering delay and re-arranges received frames in the playback order.
 
 \begin{figure}[t!]
 \centering
@@ -200,7 +200,7 @@ Audio samples are not prepended by any segment header, however the whole audio b
 \subsubsection{Frame fetching}
 
 Consumer doesn't know the total number of segments beforehand, unless the very first segment is fetched - in this case, consumer can retrieve metadata from the received segment and get total number of segments for the current frame. 
-Therefore, at first attempt, consumer tries to make a "best guess" in the number of segments she needs to fetch by issuing $M$ interests (see Figure \ref{fig:pull}). If interests arrive too early, they will be added to the producer's PIT and stay there for some amount of time $d_{gen}$ called \texttt{generation delay}. Once encoded frame is segmented into $N$ segments and these segments are published, interests $0 - M$ are answered with the data which travels back to consumer. Upon receiving first data segment, consumer retrieves metadata from it and determines total number of segments for current frame. In case if $N > M$, consumer issues $N - M$ more interests for the missing segments. These segments will be satisfied by data with no generation delay (as the frame has been published already by producer). The time interval between receiving very first segment and until the frame is fully assembled is represented by $d_{asm}$ and called \texttt{assembling time}.
+Therefore, at first attempt, consumer tries to make a "best guess" in the number of segments she needs to fetch by issuing $M$ interests (see Figure \ref{fig:pull}). If interests arrive too early, they will be added to the producer's PIT and stay there for some amount of time $d_{gen}$ called \texttt{generation delay}. Once encoded frame is segmented into $N$ segments, they are published and if $N\geq M$, interests $0 - M$ are answered with the data  which travels back to consumer. Upon receiving first data segment, consumer determines the total number of segments for the current frame and issues $N - M$ more interests for the missing segments if any. These segments will be satisfied by data with no generation delay (as the frame has been published already by producer). The time interval between receiving very first segment and until the frame is fully assembled is represented by $d_{asm}$ and called \texttt{assembling time}.
 
 \begin{figure}[t!]
 \centering
@@ -249,7 +249,7 @@ For RTC applications it is critical to receive the most recent data from the net
 \label{fig:inter-arrival}
 \end{figure}
 
-During bootstrapping, consumer "chases" producer and aims to exhasut network cache. By incerasing the number of outstanding interests, consumer "pulls cached data" out of the network unless the freshest data start to arrive. After that, the number of outstanding interests may be decreased. 
+During bootstrapping, consumer "chases" producer and aims to exhasut network cache. By incerasing the number of outstanding interests, consumer "pulls cached data" out of the network unless the freshest data starts to arrive. After that, the number of outstanding interests may be decreased. 
 
 In order to control interest expresssion, a concept of $W$ is introduced (see Figure \ref{fig:w-concept}). Consumer expresses interests only when $W > 0$. At every moment, $W$ indicates how many outstanding interests can be sent out. Before the bootstrapping phase, consumer initializes $W$ with some value. This value should reflect consumer's idea on how many interests are needed in order to exhaust network cache and reach the most recent data (Figure \ref{fig:ws} shows how bigger value of $W$ helps to exhaust cache faster). Every time a new interest is expressed, $W$ gets decremented. When new data arrives, $W$ is incremented, thus allowing consumer to issue more interests. Hence, even though interest expression is data-driven, number of outstanding interests is controlled by a consumer and directly influences how fast consumer can "chase" producer.
 

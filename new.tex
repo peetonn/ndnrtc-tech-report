@@ -1,4 +1,4 @@
-\documentclass[10pt]{proc}
+\documentclass[10pt]{icn/sig-alternate-10pt} % {proc}
 
 \usepackage{amsmath}    % need for subequations
 \usepackage{graphicx}   % need for figures
@@ -14,10 +14,10 @@
 % \usepackage{float}
 % \newfloat{algorithm}{t}{lop}
 
-\newcommand{\ndnrtcName}{\emph{ndnrtc}}
+\newcommand{\ndnrtcName}{NDN-RTC} % {\emph{ndnrtc}}
 
 \author{P.~Gusev, J.~Burke}
-\title{\ndnrtcName{} Technical Report (draft)}
+\title{\ndnrtcName{} Technical Report}
 
 \begin{document}
 
@@ -25,7 +25,7 @@
 
 %************************************************
 \abstract
-TBD
+\emph{ndnrtc} is a fully implemented real-time videoconferencing library based on the WebRTC library and VP8 codec, which has been developed to understand the challenges of low-latency communication over information-centric networks. Through it an NDN-inspired pull-based paradigm has been explored, evaluated and presented in this paper.
 
 %************************************************
 \section{Introduction}

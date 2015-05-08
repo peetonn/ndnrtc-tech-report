@@ -331,7 +331,11 @@ Bootstrapping phase starts with issuing interest with enabled \textit{RightMostC
 TBD
 
 \section{Evaluation}
-TBD
+\subsection{Role of metadata and historical data.}
+The pull-based nature of NDN and our experimental application's deliberate avoidance of explicit consumer-producer synchronization (allowing publisher-independent scaling) have shown the importance of providing sufficient meta information on producer side. Such information--which could include interests' nonce values, interests' arrival timestamps and data generation delays--if added to the returned data segment may help consumers evaluate relevant network performance, detect congestion and assess whether incoming data is likely to be stale (delayed beyond the path delay). Further, keeping historical data on consumer side may help perform better interest pipelining in the future. For instance, providing the average number of segments per frame type helps consumer make better guesses on the number of required initial interests to fetch upcoming frames, thus keeping frame fetching cycles minimal.
+
+\subsection{Application-level PIT.}
+In most cases, consumers aim to express interests for the data not yet produced, so that they may be immediately satisfied when data is produced. The current NDN-CPP library provides a producer-side Memory Content Cache implementation into which data is published. However, it is only useful when data has been published and put in the cache before interest for this data has arrived. For the missing data, the interest is forwarded to producer application which has to store it in internal pending interests table (PIT) unless requested data is ready. This functionality seems quite common for low-latency applications has now been incorporated into the NDN-CPP library implementation.
 
 \section{Issues and future work}
 TBD

@@ -14,8 +14,10 @@
 % \usepackage{float}
 % \newfloat{algorithm}{t}{lop}
 
+\newcommand{\ndnrtcName}{\emph{ndnrtc}}
+
 \author{P.~Gusev, J.~Burke}
-\title{NDN-RTC Technical Report (draft)}
+\title{\ndnrtcName{} Technical Report (draft)}
 
 \begin{document}
 
@@ -48,7 +50,7 @@ Goals:
 
 %************************************************
 \section{Architecture}
-There are two main roles defined in NDN-RTC: producer and consumer. In presence of NDN network the paradigm of real-time communication shifts from the push-based (when producer writes data to the socket and consumer reads it as fast as possible) to the pull-based (producer publishes data on the network with his own pace, while consumer has to request the data he needs and manage incoming data segments).
+There are two main roles defined in \ndnrtcName{}: producer and consumer. In presence of NDN network the paradigm of real-time communication shifts from the push-based (when producer writes data to the socket and consumer reads it as fast as possible) to the pull-based (producer publishes data on the network with his own pace, while consumer has to request the data he needs and manage incoming data segments).
 In this case, the producer’s main task is to acquire video and audio data from media inputs, encode it, pack into network packets and store them in the cache for incoming Interests – in this way, complexity shifts to the consumer, and scaling is supported by the network.
 
 Consumer implements more sophisticated algorithms to achieve following goals:
@@ -66,7 +68,7 @@ Consumer implements more sophisticated algorithms to achieve following goals:
 \label{fig:arc}
 \end{figure}
 
-Figure \ref{fig:arc} presents top-level overview of how NDN-RTC works. Local media capture and Cache belong to the producer part of the NDN-RTC. Media is stored in the cache which provides access to the data for all incoming interests. Remote playback represents consumer: it issues interests, prepares received media (assembles video frames from segments and re-orders them) and plays it back.
+Figure \ref{fig:arc} presents top-level overview of how \ndnrtcName{} works. Local media capture and Cache belong to the producer part of the \ndnrtcName{}. Media is stored in the cache which provides access to the data for all incoming interests. Remote playback represents consumer: it issues interests, prepares received media (assembles video frames from segments and re-orders them) and plays it back.
 
 \paragraph{Producer}
 
@@ -83,7 +85,7 @@ Therefore, depending on the underlying internet protocol used (IP in the existin
 \begin{figure}[t!]
 \centering
 \includegraphics[width=0.5\textwidth]{producer}
-\caption{NDN-RTC producer}
+\caption{\ndnrtcName{} producer}
 \label{fig:producer}
 \end{figure}
 
@@ -94,7 +96,7 @@ Consumer takes into account that media packets are presented by separate segment
 \begin{figure}[t!]
 \centering
 \includegraphics[width=0.5\textwidth]{consumer}
-\caption{NDN-RTC consumer}
+\caption{\ndnrtcName{} consumer}
 \label{fig:consumer}
 \end{figure}
 
@@ -116,16 +118,16 @@ As there is no direct consumer-produder communication, it is producer's job to p
 
 Besides that, the namespace should also reflect data specialization hierarchy - from general concepts in the root to more specialized entities towards the leaves. 
 
-NDN-RTC producer uses a concept of \textit{media stream} for describing published media. Media stream represents a flow of raw media packets (video frames or audio samples) coming from an input device. Streams usually derive names from their input devices. It is quite natural for a producer to publish several media streams simultaneously, if she has more than one device to publish media from (for instance, publish video from camera, audio from microphone and another video stream for sharing computer screen). As all raw data should be encoded, the next level in the name hierarchy represents different encoder instances called \textit{media threads}. Thus, media threads allow producer to provide same media stream in several copies, for instance in low, medium and high quality for video, so that consumer can have a chance to choose media thread more suitable for the current network conditions.
+\ndnrtcName{} producer uses a concept of \textit{media stream} for describing published media. Media stream represents a flow of raw media packets (video frames or audio samples) coming from an input device. Streams usually derive names from their input devices. It is quite natural for a producer to publish several media streams simultaneously, if she has more than one device to publish media from (for instance, publish video from camera, audio from microphone and another video stream for sharing computer screen). As all raw data should be encoded, the next level in the name hierarchy represents different encoder instances called \textit{media threads}. Thus, media threads allow producer to provide same media stream in several copies, for instance in low, medium and high quality for video, so that consumer can have a chance to choose media thread more suitable for the current network conditions.
 
 \begin{figure}[t!]
 \centering
 \includegraphics[width=0.5\textwidth]{streams-hierarchy}
-\caption{NDN-RTC media streams hierarchy}
+\caption{\ndnrtcName{} media streams hierarchy}
 \label{fig:stream-hierarchy}
 \end{figure}
 
-NDN-RTC does not use any specific media container format for delivering its media to consumers. Instead, encoded media packets are segmented if needed and published under distinctive hierarchical names. Video frames are separated into two domains as per frame type: \textit{delta} and \textit{key} and numbered sequentially and independently. Both sequence numbers for delta and key frames start from 0. Next level specializes data type - it can be either media data or parity. Parity data, if producer opts to publish it, can be used by consumer to recover frames that miss one or more segments. The topmost level of the namespace defines individual data segments. These segments are also numbered suquentially and segment numbers conform to NDN naming conventions \cite{ndn_naming}.
+\ndnrtcName{} does not use any specific media container format for delivering its media to consumers. Instead, encoded media packets are segmented if needed and published under distinctive hierarchical names. Video frames are separated into two domains as per frame type: \textit{delta} and \textit{key} and numbered sequentially and independently. Both sequence numbers for delta and key frames start from 0. Next level specializes data type - it can be either media data or parity. Parity data, if producer opts to publish it, can be used by consumer to recover frames that miss one or more segments. The topmost level of the namespace defines individual data segments. These segments are also numbered suquentially and segment numbers conform to NDN naming conventions \cite{ndn_naming}.
 
 There are some differences in case of the audio streams. First, there are no key frames, therefore all the audio packets are published under the \textit{delta} namespace. Second, audio samples are significantly smaller than video frames and do not require to be segmented. In practice, it appears that multiple audio samples can be bundled into one data segment. Therefore, instead of segmenting audio packets, they are bundled together until the size of one data segment is reached and published only after that.
 
@@ -134,7 +136,7 @@ Consumers need to know producer's streams structure in order to fetch data succe
 \begin{figure}[t!]
 \centering
 \includegraphics[width=0.5\textwidth]{namespace}
-\caption{NDN-RTC namespace}
+\caption{\ndnrtcName{} namespace}
 \label{fig:namespace}
 \end{figure}
 

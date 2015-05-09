@@ -11,13 +11,19 @@
 \usepackage{caption}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
+\usepackage{authblk}
 % \usepackage{float}
 % \newfloat{algorithm}{t}{lop}
 
 \newcommand{\ndnrtcName}{NDN-RTC} % {\emph{ndnrtc}}
 \newcommand{\ndnconName}{NdnCon}
 
-\author{P.~Gusev, J.~Burke}
+%\author[1]{Peter Gusev \href{mailto:peter@remap.ucla.edu}{peter@remap.ucla.edu}}
+%\author[1]{Jeff Burke \href{mailto:jburke@remap.ucla.edu}{jburke@remap.ucla.edu}}
+%\affil[1]{UCLA REMAP}
+\author{Peter Gusev \\ \href{mailto:peter@remap.ucla.edu}{\texttt{peter@remap.ucla.edu}} 
+\and Jeff Burke \\ \href{mailto:jburke@remap.ucla.edu}{\texttt{jburke@remap.ucla.edu}}}
+
 \title{\ndnrtcName{} Technical Report}
 
 \begin{document}
@@ -44,21 +50,26 @@ The rest of the paper is organized as follows. Section \ref{sec:bg} covers backg
 %************************************************
 \section{Background and prior work}
 \label{sec:bg}
-TBD
+To authors' knowledge, \ndnrtcName{} is one of the few applications with perceptual real-time requirements tested on Information Centric Networking platform over a multi-hop testbed. 
+
+A non-real time video-streaming software solution called NDNVideo \cite{ndnvideo} had successfully been tested and deployed on NDN network and prooved its' high scalability. The project focused on developing random-access and live video for location-based and mixed reality applications. Another conferencing application, however audio-only, was developed in \cite{act-tool}. It leveraged use of Mumble VoIP software but used NDN as a transport. Some initial effort for conference and user discovery is made in this work as well. This work suggests that building on an existing, resilient platform is the best way to generate a usable application. Therefore, \ndnrtcName{} was chosen to be built on top of WebRTC library in order to utilize its' audio-processing capabilities, video codecs and potentially give an opportunity for easier integration with the supported web-browsers.
 
 %************************************************
 \section{Goals}
 \label{sec:goals}
-TBD
+Initial goals of the \ndnrtcName{} project are to provide low-latency audio/video multi-party conferencing application which can be used by NDN project team members across existing NDN testbed. It can be also used as a traffic generator application for future researches in NDN routing algorithms, congestion control and general testing of the network architecture ideas.
 
-Goals:
+\paragraph{Low-latency (150-300ms) audio/video communication}
+Library should be capable to maintain similar sub-second latency communication for audio and video as in dirver applications like Skype, WebEX, Goolg Hangouts.
 
-\begin{itemize}
-\item Low-latency (150-300ms) audio/video communication
-\item Multi-party conferencing
-\item Passive consumer (no negotiation and/or coordination)
-\item Content verification
-\end{itemize}
+\paragraph{Multi-party conferencing}
+Publishing and fetching several media streams simultaneously should not require significant computational resources from the user and should maintain the same latency as in one-to-one conferencing case.
+
+\paragraph{Passive consumer}
+There should be no explicit negotiation or any coordination between active conference members as it may limit scalability and flexibility of use.
+
+\paragraph{Content verification}
+Library should provide content verification using existing NDN signature capabilities. 
 
 %************************************************
 \section{Architecture}

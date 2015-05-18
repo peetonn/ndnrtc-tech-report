@@ -355,24 +355,53 @@ Bootstrapping phase starts with issuing interest with enabled \textit{RightMostC
 
 \section{Implementation}
 \label{sec:imp}
-TBD
+\ndnrtcName{} is implemented as a library written in C++. 
+It provides publisher interface - for publishing arbitrary number of media streams (audio or video), and consumer interface with a callback for rendering decoded video frames in a host application. OS X platform is supported currently, though Linux build instructions will be added soon. 
+The library distribution also comes with a simple console application which demonstrates the use of \ndnrtcName{} library.
+
+\ndnrtcName{} exploits some functionality from several third-party libraries it is linked against with:
+\begin{itemize} 
+\item NDN-CPP \cite{ndnccl} is used for NDN connectivity;
+\item WebRTC framework \cite{webrtc} is utilized in two ways:
+\begin{itemize}
+\item incorporation of the existing video codec
+\item full incorporation of the existing WebRTC audio pipeline, including echo cancellation
+\end{itemize}
+\item OpenFec \cite{openfec} library is utilized for forwad error correction support.
+\end{itemize}
+
+Apart from the library, first desktop NDN videconferencing application NdnCon \cite{ndncon} was implemented atop \ndnrtcName{}. It provides convenient UI for publishing and fetching media streams, text chat and organizing multi-party audio/video conferences.
 
 \section{Evaluation}
 \label{sec:eval}
 \subsection{Role of metadata and historical data}
-The pull-based nature of NDN and our experimental application's deliberate avoidance of explicit consumer-producer synchronization (allowing publisher-independent scaling) have shown the importance of providing sufficient meta information on producer side. Such information--which could include interests' nonce values, interests' arrival timestamps and data generation delays--if added to the returned data segment may help consumers evaluate relevant network performance, detect congestion and assess whether incoming data is likely to be stale (delayed beyond the path delay). Further, keeping historical data on consumer side may help perform better interest pipelining in the future. For instance, providing the average number of segments per frame type helps consumer make better guesses on the number of required initial interests to fetch upcoming frames, thus keeping frame fetching cycles minimal.
+The pull-based nature of NDN and our experimental application's deliberate avoidance of explicit consumer-producer synchronization (allowing publisher-independent scaling) have shown the importance of providing sufficient meta information on producer side. Such information - which could include interests' nonce values, interests' arrival timestamps and data generation delays - if added to the returned data segment may help consumers evaluate relevant network performance, detect congestion and assess whether incoming data is likely to be stale (delayed beyond the path delay). Further, keeping historical data on consumer side may help perform better interest pipelining in the future. For instance, providing the average number of segments per frame type helps consumer make better guesses on the number of required initial interests to fetch upcoming frames, thus keeping frame fetching cycles minimal.
 
 \subsection{Application-level PIT}
 In most cases, consumers aim to express interests for the data not yet produced, so that they may be immediately satisfied when data is produced. The current NDN-CPP library provides a producer-side Memory Content Cache implementation into which data is published. However, it is only useful when data has been published and put in the cache before interest for this data has arrived. For the missing data, the interest is forwarded to producer application which has to store it in internal pending interests table (PIT) unless requested data is ready. This functionality seems quite common for low-latency applications has now been incorporated into the NDN-CPP library implementation.
 
 \section{Issues and future work}
 \label{sec:future}
+In current library design, producer may deliberately choose to publish several copies of the same video stream with different encoding parameters, thus allowing consumer to select the most appropriate stream for current network conditions. However, the selection is made manualy and depends on user's perceptual assessment of the retrieved media. Implementation of adaptive rate control would simplify this process and allow to utilize network more efficiently based on current conditions.
 
-% adaptive rate control
+An elegant way to offload producer from publishing multiple copies of the same video stream in different bandwidths is to utilize Scalable Video Coding. By reflecting SVC layers in the namespace, consumer can have more freedom for adapting media streams to the current network. This opportunity should be explored and added in a future versions.
 
-% media encryption?
+Current \ndnrtcName{} design supports basic content signing and verification. However, several basic security features are not yet implemented:
+
+\begin{itemize}
+\item signatures consistency checks for successive media packets;
+\item unknown but verified publishers trust; 
+\item media data encryption;
+\item consumer access control.
+\end{itemize}
+
+Currently, any media streams that are published over the NDN network can be fetched without publisher's knowledge which keeps conferencing far from privacy and introduces analogy of a "video Twitter" with ungranted access to the published data. While this might seem desirable and useful in some cases, more work is needed to support conventional "conferencing" paradigm with privacy, verification and access control.
 
 \section{Conclusion}
 \label{sec:conclusion}
+
+
+\bibliographystyle{abbrv}
+\bibliography{bibliography}
 
 \end{document}

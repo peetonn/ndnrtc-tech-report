@@ -15,6 +15,7 @@
 \usepackage{algorithm}
 \usepackage{algpseudocode}
 \usepackage{enumitem}
+\usepackage{pstricks}
 
 %\usepackage{authblk}  %% supported in class
 % \usepackage{float}
@@ -365,27 +366,53 @@ Apart from the library, first desktop NDN videconferencing application \ndnconNa
 
 \section{Evaluation}
 \label{sec:eval} 
+In the course of this project, there were several iterations of architecture design that introduced successive improvements to the overall quality of the algorithms. They are described further in this section. Each iteration tackles problems revealed during tests, which were mostly taken in practice rather than simulated.
 
-Most tests done in practice rather than simulation. 
+\subsection{Key namespace}
+As was described in previous sections, Key frames are usually much heavier than Delta frames and require more data segments for delivery. In early library versions, this differentiation was not reflected in producer's namespace which made consumer to pipeline equal number of initial interests ($M$ on Figure \ref{fig:pull}) for both frame types. This resulted in larger assembling times ($d_{asm}$) for the Key frames and additional round-trips of missing interests. Increased assembling time quite often caused skipping incomplete Key frames as they were not assembled by the time they should be played out. Eventually, all the consequent Delta frames were skipped as well which degraded overall video streaming experience by introducing video "hiccup" effect.
 
-\subsection{Test setup} 
+Having separate namespace for Key frames allowed consumer to maintain separate interest pipelines per frame time and collect historical data on the average number of interests required to fully retrieve one frame of each type in one round trip.
 
-Include testbed topologies used, collaboration with WUSTL
+\subsection{Audio bundling}
+\begin{figure}[t!]
+\centering
+\begin{tiny}
+\def\svgwidth{0.5\textwidth}\input{tests-skype.pdf_tex}
+\end{tiny}
+\vspace{-18pt}
+\caption{2-peer conference tests compared to Skype}
+\label{fig:tests-skype}
+\end{figure}
 
-\subsection{Quality of experience} 
+A series of tests were taken in order assess efficiency and quality of service compared to Skype calls. Each test was comprised of six runs of 2-person 5-minute conference talks using NdnCon (GUI conferencing application build atop \ndnrtcName{}):
+\begin{itemize}
+\item 3 runs of audio+video on low, medium and high qualities (0.5, 0.7 and 1.5 Mbit/s accordingly);
+\item 1 run of audio-only;
+\item 1 run of Skype audio+video conference;
+\item 1 run of Skype audio only conference.
+\end{itemize}
 
-How was the end-user quality of experience by the time the paper was written
-What kinds of things did you add to support it. 
+Tests were taken across existing NDN testbed between REMAP hub (aleph.ndn.ucla.edu) and six other hubs. Therefore, tests were covering both one-hop and multi-hop topologies.
 
-\subsection{Scaling}
+Figure \ref{fig:tests-skype} shows overall bitrate usage results. Firstly, whereas Skype has fully utilized link capacity between peers and delivered higher bitrate videos, NdnCon did not adjust to the current network conditions which makes feature of adaptive rate control highly desirable.
 
-How did things seem to scale? 
+Actual average bitrates are turned out to be slightly higher than pre-configured video streams (0.7, 0.9 and 1.8 Mbit/s) which can be explained by NDN packet overhead which is about 280-330 bytes large and account for $\approx$30\% of segment size (1000 bytes). Having such large overhead makes transferring audio samples in separate segments highly inefficient. Thus, further improvent to the algorithms was to bundle consecutive audio samples unless they fill the size of a segment. With 90 Kbit/s audio, approximately 5 audio samples can be added to 1000-bytes data segment. This improvement eventually reduced audio bandwith efficiently (and interests number on consumer side) and made it comparable to Skype ausio bandwiths.
 
-\subsection{Performance of buffering and interest expression control}
+\subsection{Consumer-Producer synchronization}
 
-How did the interest expression control work, and get adjusted
- 
-How did buffering work, and get adjusted? 
+\begin{figure}[t!]
+\centering
+\includegraphics[width=0.5\textwidth]{buffer}
+\caption{Bufferization in earlier library versions}
+\label{fig:old-buf}
+\end{figure}
+
+In previous library versions, consumer "chased" producer by exhausting cached data and issuing large number of outstanding interests. However, there were no mechanism for consumer to figure out how early those interests are issued and whether interest expression should be postponed in order to eliminate timeouts. For two similar test runs (one-hop topology) the number of timed out interests and retransmissions could vary greatly (either $\approx$1\% or $\approx$50\%). The latter case happened due to incorrect consumer's synchronization with producer - interests were issued too early so that they were timed out before any data has been produced. This problem could be solved by increased interests' lifetime. However, for previous library versions, bufferization mechanism (see Figure \ref{fig:old-buf}) dictated interests' lifetime - in fact, in order to maintain re-transmission checkpoint, all interests entering the buffer should have lifetime equals half of the current buffer size. This approach resulted in unavoidable interests time outs in cases when consumer issued interests far too early before the actual data was produced.
+
+For the current version of the library, re-transmission check-point is placed at $RTT$ milliseconds from the end of the buffer ($J=RTT$ on the Figure \ref{fig:old-buf}), this, together with updated NFD retransmission streategy \cite{nfd-rtx}, alllowed larger interests lifetimes.
+
+Moreover, the problem described above could not have happened if consumer would know that it issues interests too early. Chasing algorithm in older library versions was exhausting network cached in rather aggressive manner - interests were issued constantly unless they fill up the buffer. After that, frames would be consumed at producer's rate and more interests issued unless consumer reaches stable data arrivals. This approach lacks from any knowledge about issued interests and generation delay or $RTT`$ is not taken into account.
+
 \begin{figure}[t!]
 \centering
 %\captionsetup[subfigure]{aboveskip=-1pt,belowskip=-2pt}
@@ -398,9 +425,24 @@ How did buffering work, and get adjusted?
 \label{fig:ws}
 \end{figure}
 
-(Figure \ref{fig:ws} shows how bigger value of $W$ helps to exhaust cache faster). The number of outstanding interests is controlled by a consumer and directly influences how fast consumer can ``chase" the producer. Every time a new interest is expressed, $W$ gets decremented and when new data arrives, $W$ is incremented, thus allowing consumer to issue more interests.
+With introduction of $W$ concept, consumer have full control of the interest expression. Figure \ref{fig:ws} shows how bigger value of $W$ helps to exhaust cache faster. The number of outstanding interests is controlled by a consumer and directly influences how fast consumer can ``chase" the producer. Every time a new interest is expressed, $W$ gets decremented and when new data arrives, $W$ is incremented, thus allowing consumer to issue more interests. $W$ concept allows "lazy" start for consumer - by specifying smaller $W$, consumer issues less interests. Further, consumer observes cache exhaustion by monitoring $D_{arr}$ and, if cache has not been exhausted during allocated time, consumer may increase the value of $W$ in order to express more interests. Similarly, consumer may opt to decrease $W$ in cases where original value resulted in too agressive behaviour.
 
+%\subsection{Test setup} 
 
+%Include testbed topologies used, collaboration with WUSTL
+
+%- one-hop
+%- multiple-hops
+%- many-to-many conferencing
+
+%\subsection{Quality of experience} 
+
+%How was the end-user quality of experience by the time the paper was written
+%What kinds of things did you add to support it. 
+
+\subsection{Scaling}
+
+For now, there were few multi-peer tests conducted using NdnCon. The maximum number of participants involved in audio/video conference was four people, who were spread out accross 4 different campuses.
 
 \section{Conclusion and Future Work}
 \label{sec:conclusion}

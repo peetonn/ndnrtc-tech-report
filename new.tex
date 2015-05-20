@@ -15,7 +15,7 @@
 \usepackage{algorithm}
 \usepackage{algpseudocode}
 \usepackage{enumitem}
-\usepackage{pstricks}
+%\usepackage{pstricks}
 
 %\usepackage{authblk}  %% supported in class
 % \usepackage{float}
@@ -193,14 +193,14 @@ Producer generates signed data objects from input media streams and places them 
 
 \subsubsection{Metadata}
 
-Besides actual stream data, data objects contain some amount of meta information which is prepended during frames segmenting (see Figure \ref{fig:segment}). There are two types of headers: \textit{Frame header} and \textit{Segment header}. Frame header is prepended to segment \#0 of each individual video frame and contains media-specific information (such as size of a frame), timestamp, current rate and unix timestamp, which can be used for calculating actual delay between NTP-synchronized producer and consumers (see Figure \ref{fig:data-struct}). Segment header is prepended to every segment of a frame. It carries network-level information which can be used by consumer for making certain assumptions about current network conditions and origin of the data objects received:
+Besides actual stream data, data objects contain some amount of meta information which is prepended during frames segmenting (see Figure \ref{fig:segment}). There are two header types: \textit{Frame header} and \textit{Segment header}. Frame header is prepended to segment \#0 of each individual video frame, and contains media-specific information (such as size of a frame), timestamp, current rate and unix timestamp, which can be used for calculating actual delay between NTP-synchronized producer and consumers (see Figure \ref{fig:data-struct}). Segment header is prepended to every segment of a frame. It carries network-level information which can be used by consumer for making certain assumptions about current network conditions and origin of the data objects received:
 \begin{itemize} [label={}]
 
-\item \textit{Interest arrival timestamp.} Timestamp of the interest arrival. Monitoring this value and interest expression timestamps over time may give consumer a clue about how long does it take for interests to reach producer. This value is only valid when nonce value belongs to one of the consumer's interests.
+\item \textit{Interest arrival timestamp}: Timestamp of the interest arrival. Monitoring this value and interest expression timestamps over time may give consumer a clue about how it takes for Interests to reach producer. This value is only valid when nonce value belongs to one of the consumer's Interests.
 
-\item \textit{Generation delay.} Time interval in milliseconds between interest arrival and segment publishing. Consumer can use this value to her advantage in order to control the number of outstanding interests. This value is only valid when nonce value belongs to one of the consumer's interests.
+\item \textit{Generation delay}: Time interval in milliseconds between Interest arrival and segment publishing. Consumer can use this value in order to control the number of outstanding Interests. This value is only valid when nonce value belongs to one of the consumer's Interests.
 
-\item \textit{Interest nonce.} Nonce value of the interest which requested this particular segment. There are three meaningful cases:  1) \textit{value belongs to the interest issued previously} - consumer received non-cached data requested by interest issued previously; 2) \textit{value is non-zero, but doesn't belong to any of the previously issued interests} - consumer received data requested by some other consumer; data may be cached; 3) \textit{value is zero} - consumer received data which was cached on producer side and never requested by anyone before.
+\item \textit{Interest nonce}: Nonce value of the interest which requested this particular segment. There are three meaningful cases:  1) \textit{value belongs to the Interest issued previously} - consumer received non-cached data requested by Interest issued previously; 2) \textit{value is non-zero, but does not belong to any of the previously issued Interests} - consumer received data requested by some other consumer; data may be cached; 3) \textit{value is zero} - consumer received data which was cached on producer side and never requested by anyone before.
 
 \end{itemize}
 
@@ -217,15 +217,15 @@ Audio samples are not prepended by any segment header, however the whole audio b
 %************************************************
 \subsection{Consumer}
 
-The Consumer implements more sophisticated algorithms to achieve following goals:
+Consumer implements more sophisticated algorithms to achieve following goals:
 \begin{itemize}
 \item ensure fetching the latest data available in the network; 
-\item choose appropriate media stream bandwiths provided by a producer by monitoring network conditions;
+\item choose appropriate media stream bandwiths provided by a producer, by monitoring network conditions;
 \item playback fetched media in correct order;
 \item handle network latency and packet drops.
 \end{itemize}
 
-Consumer takes into account that media packets are presented by separate segments in the network. Therefore, consumer implements mechanisms of interest pipelining and frame buffering (see Figure \ref{fig:consumer}). Interest pipeliner issues interests for individual segments and is controlled by some higher-level logic which achieves one out of four consumer's goals - ensures that only the latest data is fetched. Packets re-ordering, drops and latency fluctuations absorbtion are attained by the frame buffer which introduces buffering delay and re-arranges received frames in the playback order.
+Consumer takes into account that media packets are presented by separate segments in the network. Therefore, consumer implements mechanisms of Interest pipelining and frame buffering (see Figure \ref{fig:consumer}). Interest pipeline issues Interests for individual segments, and is controlled by some higher-level logic which achieves one out of four consumer's goals. It ensures that only the latest data is fetched. Packets re-ordering, drops and latency fluctuations absorbtion are attained by the frame buffer, which introduces buffering delay and re-arranges received frames in the playback order.
 
 
 
@@ -233,7 +233,7 @@ Consumer takes into account that media packets are presented by separate segment
 \subsubsection{Frame fetching}
 
 Consumer does not know the total number of segments beforehand, unless the very first segment is fetched. In this case, consumer can retrieve metadata from the received segment and acquire total number of segments for the current frame. 
-Therefore, at first attempt, consumer tries to make a "best guess" at the number of segments needed to fetch, by issuing $M$ Interests (see Figure \ref{fig:pull}). If Interests arrive too early, they will be added to the producer's PIT and stay there for some amount of time $d_{gen}$ called \texttt{generation delay}. Once encoded frame is segmented into $N$ segments, they are published, and if $N\geq M$, Interests $0 - M$ are answered with the data which travels back to consumer. Upon receiving first data segment, consumer determines the total number of segments for the current frame, and issues $N - M$ more Interests for the missing segments (if any). These segments will be satisfied by data with no generation delay (as the frame has been published already by producer). The time interval between receiving very first segment and when the frame is fully assembled is represented by $d_{asm}$ and called \texttt{assembling time}.
+Therefore, at first attempt, consumer tries to make a "best guess" at the number of segments needed to fetch, by issuing $M$ Interests (see Figure \ref{fig:pull}). If Interests arrive too early, they will be added to the producer's PIT and stay there for the amount of time $d_{gen}$ called \texttt{generation delay}. Once encoded frame is segmented into $N$ segments, these are published, and if $N\geq M$, Interests $0 - M$ are answered with the data which travels back to consumer. Upon receiving first data segment, consumer determines the total number of segments for the current frame, and issues $N - M$ more Interests for the missing segments (if any). These segments will be satisfied by data with no generation delay (as the frame has been published already by producer). The time interval between receiving very first segment and when the frame is fully assembled is represented by $d_{asm}$ and called \texttt{assembling time}.
 
 \begin{figure}[t!]
 \centering
@@ -245,7 +245,7 @@ Therefore, at first attempt, consumer tries to make a "best guess" at the number
 
 Needless to say, additional round-trips for requesting missing data segments increase overall frame assembling time and chances that the frame will be incomplete by the time it should be played back. This problem could be avoided if consumer is able to make better guesses of the number of initial Interests. Therefore, the following considerations were introduced in later versions of the library:
 \begin{itemize}
-\item consumer should know what type of frame to be fetched (as average number of segments varies greatly for different frame types);
+\item consumer should know what type of frame is to be fetched (as average number of segments varies greatly for different frame types);
 \item consumer should track average number of segments per frame type.
 \end{itemize}
 
@@ -267,11 +267,11 @@ As in traditional streaming applications, consumer uses frame buffering in order
 \item \textit{estimated size} = \textit{playback size} + \textit{number of reserved slots} $\times$ 1/\textit{producer rate}.
 \end{itemize}
 
-The difference between estimated size and playback size ($RTT^{\prime}$) can not be smaller than the current average RTT value. In fact, keeping this value at a minimum indicates that consumer receives the most recent data with the minimal amount of outstanding Interests. Monitoring this value over time may help consumer get a better clue on the "sync" status with the producer. For example, consumer may use it during the fetching process, as will be discussed in the next section. 
+The difference between estimated size and playback size ($RTT^{\prime}$) cannot be smaller than the current average RTT value. In fact, keeping this value at a minimum indicates that consumer receives the most recent data with the minimal amount of outstanding Interests. Monitoring this value over time may help consumer get a better clue on the "sync" status with the producer. For example, consumer may use it during the fetching process, as will be discussed in the next section. 
 
 \subsubsection{Interest expression control}
 
-The key challenge in a consumer-driven model for videoconferencing is to \emph{ensure the consumer gets the latest data in a caching network}, without resorting to direct producer-consumer communication that would limit scaling. To get fresh data, which can be cached but should not be the newest available for the consumer's path,  the consumer cannot rely only on using such flags as \textit{AnswerOriginKind} and \textit{RightMostChild}. The high frequency nature of streaming data makes no guarantees that the data satisfying those flags received by a consumer will be the most recent one. Instead, it is necessary to use other indicators to ensure that the network supplies up-to-date stream data. The basic solution is to leverage the known segment publishing rate and assume, under normal operation, that a series of old, cached samples, can be retrieved more quickly than new data. The inter-arrival delays ($D_{arr}$) of the most recent samples follow the publishers' generation pattern but cached data will follow interest expression temporal pattern. Therefore, by monitoring inter-arrival delays of consequtive media samples, consumers can make educated assumptions about data freshness (see Figure \ref{fig:inter-arrival}).
+The key challenge in a consumer-driven model for videoconferencing is to \emph{ensure the consumer gets the latest data in a caching network}, without resorting to direct producer-consumer communication that would limit scaling. To get fresh data, which can be cached but should not be the newest available for the consumer's path,  the consumer cannot rely only on using such flags as \textit{AnswerOriginKind} and \textit{RightMostChild}. The high frequency nature of streaming data makes no guarantees that the data satisfying those flags received by a consumer will be the most recent one. Instead, it is necessary to use other indicators to ensure that the network supplies up-to-date stream data. The basic solution is to leverage the known segment publishing rate and assume, under normal operation, that a series of old, cached samples can be retrieved more quickly than new data. The inter-arrival delays ($D_{arr}$) of the most recent samples follow the publishers' generation pattern, but cached data will follow the Interest expression temporal pattern. Therefore, by monitoring inter-arrival delays of consequtive media samples, consumers can make educated assumptions about data freshness (see Figure \ref{fig:inter-arrival}).
 
 \begin{figure}[t!]
 \centering
@@ -283,7 +283,7 @@ The key challenge in a consumer-driven model for videoconferencing is to \emph{e
 \label{fig:inter-arrival}
 \end{figure}
 
-During bootstrapping, the consumer "chases" the producer and aims to exhasut network cache of historical (non-real time) segments. By incerasing the number of outstanding interests, consumer "pulls cached data" out of the network unless the freshest data start to arrive. In order to control interest expresssion, a concept of $W$ (roughly an "interest window") is introduced (see Figure \ref{fig:w-concept}). Consumer expresses interests only when $W > 0$. At every moment, $W$ indicates how many outstanding interests can be sent out. Before the bootstrapping phase, consumer initializes $W$ with some value which reflects consumer's idea on how many interests are needed in order to exhaust network cache and reach the most recent data. 
+During bootstrapping, the consumer "chases" the producer and aims to exhaust network cache of historical (non-real time) segments. By increasing the number of outstanding Interests, consumer "pulls cached data" out of the network, unless the freshest data begin to arrive. In order to control Interest expression, a concept of $W$ (roughly an "Interest window") is introduced (see Figure \ref{fig:w-concept}). Consumer expresses Interests only when $W > 0$. At every moment, $W$ indicates how many outstanding Interests can be sent. Before the bootstrapping phase, consumer initializes $W$ with a value which reflects consumer's idea of how many Interests are needed in order to exhaust network cache and reach the most recent data. 
 
 \begin{figure}[t!]
 \centering
@@ -297,11 +297,11 @@ During bootstrapping, the consumer "chases" the producer and aims to exhasut net
 \end{figure}
 
 
-$W$ provides a simple mechanism which can be used to speed up or slow down interests expression. Any increase in $W$ value makes consumer to issue more interests (Figure \ref{fig:int-burst}), whereas decrease in $W$ holds consumer back from sending any new interests (Figure \ref{fig:int-hold}). Larger values of $W$ make consumer faster reach synchronized state with producer. However, larger value means larger number of outstanding interests and larger $RTT^\prime$ because of longer generation delays $d_{gen}$ for each media sample. By adjusting the value of $W$ and observing inter-arrival delays $D_{arr}$ consumer can find minimal $RTT^\prime$ value while still getting non-cached data, thus achieving best synchronization state with producer.
+$W$ provides a simple mechanism to speed up or slow down Interests expression. Any increase in $W$ value makes consumer issue more Interests (Figure \ref{fig:int-burst}), whereas decrease in $W$ holds consumer back from sending any new Interests (Figure \ref{fig:int-hold}). Larger values of $W$ make consumer reach synchronized state with producer more quickly. However, a larger value means a larger number of outstanding Interests and larger $RTT^\prime$ because of longer generation delays $d_{gen}$ for each media sample. By adjusting the value of $W$ and observing inter-arrival delays $D_{arr}$ consumer can find minimal $RTT^\prime$ value while still getting non-cached data, thus achieving best synchronization state with producer.
 
-For more complex scenario of video streaming, consumer controls expression of "bulks" of interests instead of individual interests, because video frames are composed of several segments. In this case, $W$ is adjusted on per-frame basis, rather than per-segment. In all other respects, the same above logic can be applied.
+For more complex scenarios of video streaming, consumer controls expression of "bulks" of Interests rather than individual Interests, because video frames are composed of several segments. In this case, $W$ is adjusted on a per-frame basis, rather than per-segment. In all other respects, the same logic (as above) can be applied.
 
-Bootstrapping phase starts with issuing interest with enabled \textit{RightMostChild} selector in delta namespace for audio and key namespace for video. The reason, why this process differs for video streams is that consumer is not interested in fetching delta frames without having corresponding key frame for decoding. Once initial data segment of sample with number $S_{seed}$ has been received, consumer initializes $W$ with some initial value $N$ and asks for the next sample data $S_{seed}+1$ in the appropriate namespace. Upon receiveing first segments of sample $S_{seed}+1$, consumer initiates fetching process described above for all namespaces (delta and key, if available). Bootstrapping phase stops when consumer finds minimal value of $W$ which still allows receiving the most recent data - i.e. consumer reaches synchronized state with producer and switches to a normal fetching phase where no adjustments for $W$ are needed. 
+The bootstrapping phase starts with issuing Interest with enabled \textit{RightMostChild} selector, in delta namespace for audio and key namespace for video. The reason this process differs for video streams is that consumer is not interested in fetching delta frames without having corresponding key frame for decoding. Once initial data segment of sample with number $S_{seed}$ has been received, consumer initializes $W$ with initial value $N$ and asks for the next sample data $S_{seed}+1$ in the appropriate namespace. Upon receiveing first segments of sample $S_{seed}+1$, consumer initiates fetching process (described above) for all namespaces (delta and key, if available). This bootstrapping phase stops when consumer finds the minimal value of $W$ which still allows receiving the most recent data, i.e., consumer reaches synchronized state with producer and switches to a normal fetching phase where no adjustments for $W$ are needed. 
 % Listing \ref{lst:fetch-algo} shows pseudo-code for the bootstrapping phase.
 
 % \begin{algorithm}
@@ -352,12 +352,12 @@ Bootstrapping phase starts with issuing interest with enabled \textit{RightMostC
 
 
 %\subsubsection{Application-level PIT}
-\textit{Application-level PIT} In most cases, consumers aim to express interests for the data not yet produced, so that they may be immediately satisfied when data is produced. The current NDN-CPP library provides a producer-side Memory Content Cache implementation into which data is published. However, it is only useful when data has been published and put in the cache before interest for this data has arrived. For the missing data, the interest is forwarded to producer application which has to store it in internal pending interests table (PIT) unless requested data is ready. This functionality seems quite common for low-latency applications has now been incorporated into the NDN-CPP library implementation.
+\textit{Application-level PIT.} In most cases, consumers aim to express Interests for the data not yet produced, to be immediately satisfied when data is produced. The current NDN-CPP library provides a producer-side Memory Content Cache implementation into which data is published. However, this is only useful when data has been published and put in the cache before Interest for this data has arrived. For the missing data, the Interest is forwarded to the producer application which stores it in internal pending interests table (PIT) unless requested data is ready. This functionality seems quite common for low-latency applications, and has now been incorporated into the NDN-CPP library implementation.
 
 \section{Implementation}
 \label{sec:imp}
 \ndnrtcName{} is implemented as a library written in C++, which is available at \url{https://github.com/remap/ndnrtc}. 
-It provides publisher interface - for publishing arbitrary number of media streams (audio or video), and consumer interface with a callback for rendering decoded video frames in a host application. OS X platform is supported currently, though Linux build instructions will be added soon. 
+It provides publisher interface for publishing arbitrary number of media streams (audio or video), and consumer interface with a callback for rendering decoded video frames in a host application. OS X platform is currently supported; Linux build instructions will be added soon. 
 The library distribution also comes with a simple console application which demonstrates the use of \ndnrtcName{} library.
 
 \ndnrtcName{} exploits some functionality from several third-party libraries it is linked against with: NDN-CPP \cite{ndnccl} is used for NDN connectivity. The WebRTC framework \cite{webrtc} is utilized in two ways: 1) incorporation of the existing video codec; 2) full incorporation of the existing WebRTC audio pipeline, including echo cancellation;  3) OpenFec \cite{openfec} library is utilized for forwad error correction support.

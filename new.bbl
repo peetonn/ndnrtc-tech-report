@@ -1,0 +1,22 @@
+\begin{thebibliography}{1}
+
+\bibitem{webrtc}
+May 2015.
+
+\bibitem{openfec}
+May 2015.
+
+\bibitem{ndncon}
+May 2015.
+
+\bibitem{ndnvideo}
+J.~B. Derek~Kulinski.
+\newblock Ndnvideo: Random-access live and pre-recorded streaming using ndn.
+\newblock {\em NDN, Technical Report NDN-0007}, September 2012.
+
+\bibitem{ndnccl}
+J.~B. Jeff~Thompson.
+\newblock Ndn common client libraries.
+\newblock {\em NDN, Technical Report NDN-0007}, September 2012.
+
+\end{thebibliography}

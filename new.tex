@@ -48,7 +48,7 @@
 
 %************************************************
 \abstract
-\ndnrtcName{} is a real-time videoconferencing library that employs Named Data Networking (NDN), a proposed future Internet Architecture. It was designed to provide an end-user experience similar to Skype or Google Hangouts, while taking advantage of the NDN architecture's name-based forwarding, data signatures, caching, and request aggregation. It demonstrates low-latency HD video communication over NDN, without direct producer-consumer coordination, which enables scaling to many consumers through the capacity of the network rather than the capacity of the producer. Internally, it employs widely used open source components, including the WebRTC library, VP9 codec, and OpenFEC for forward error correction. This paper presents the design, implementation in C++, and testing of \ndnrtcName{} on the NDN testbed using a demonstration GUI conferencing application, \ndnconName{}.
+\ndnrtcName{} is a real-time videoconferencing library that employs Named Data Networking (NDN), a proposed Future Internet Architecture. It was designed to provide an end-user experience similar to Skype or Google Hangouts, while taking advantage of the NDN architecture's name-based forwarding, data signatures, caching, and request aggregation. It demonstrates low-latency HD video communication over NDN, without direct producer-consumer coordination, which enables scaling to many consumers through the capacity of the network rather than the capacity of the producer. Internally, it employs widely used open source components, including the WebRTC library, VP9 codec, and OpenFEC for forward error correction. This paper presents the design, implementation in C++, and testing of \ndnrtcName{} on the NDN testbed using a demonstration GUI conferencing application, \ndnconName{}.
 
 %************************************************
 \section{Introduction}
@@ -193,7 +193,7 @@ The pull-based nature of NDN and our experimental application's deliberate avoid
 
 %************************************************
 \subsection{Data objects}
-Producer generates signed data objects from input media streams and places them in cache instantly. Incoming Interests retrieve data from cache, if it is present, or forward further to the producer, if the requested data has yet to be produced. In such cases, the producer maintains a pending Interests table (PIT), which is checked every time a new data object is generated. If an Interest for a newly generated data object exists in the PIT, it gets answered, and PIT entry is erased.
+Producer generates signed data objects from input media streams and places them in cache instantly. Incoming Interests retrieve data from cache, if it is present, or forward further to the producer, if the requested data has yet to be produced. In such cases, the producer maintains a Pending Interests Table (PIT), which is checked every time a new data object is generated. If an Interest for a newly generated data object exists in the PIT, it gets answered, and PIT entry is erased.
 
 \subsubsection{Media stream}
 %% TODO: What's the media payload? 
@@ -234,23 +234,25 @@ Audio samples are not prepended by any segment header, however the whole audio b
 %************************************************
 \subsection{Consumer}
 
-Consumer implements more sophisticated algorithms to achieve following goals:
+The consumer implements more sophisticated algorithms to achieve the following goals:
 \begin{itemize}
-\item ensure fetching the latest data available in the network; 
-\item choose appropriate media stream bandwiths provided by a producer, by monitoring network conditions;
-\item playback fetched media in correct order;
-\item handle network latency and packet drops.
+\item fetching the latest data available in the network; 
+\item choosing appropriate media stream bandwidths provided by the producer (by monitoring network conditions);
+\item fetching media in correct order, for playback;
+\item handling network latency and packet drops.
 \end{itemize}
 
-The consumer takes into account that media packets are presented by separate segments in the network. Therefore, the consumer implements mechanisms of Interest pipelining and frame buffering (see Figure \ref{fig:consumer}). Interest pipeline issues Interests for individual segments, and is controlled by some higher-level logic which achieves one out of four consumer's goals. It ensures that only the latest data is fetched. Packets re-ordering, drops and latency fluctuations absorbtion are attained by the frame buffer, which introduces buffering delay and re-arranges received frames in the playback order.
-
+The consumer takes into account that media packets are presented by separate segments in the network. Therefore, the consumer implements mechanisms of Interest pipelining and frame buffering (see Figure \ref{fig:consumer}). Interest pipeline issues Interests for individual segments, and is controlled by some higher-level logic which achieves one out of four consumer goals. It ensures that only the latest data is fetched. Packets re-ordering and drops and latency fluctuations absorption are attained by the frame buffer, which introduces buffering delay and re-arranges received frames in the playback order.
+%%Sentence 3 of the previous paragraph could mean a few things as currently written.
 
 
 %************************************************
 \subsubsection{Frame fetching}
 
-Consumers do not know the total number of segments beforehand, unless the very first segment is fetched. In this case, the consumer can retrieve metadata from the received segment and acquire total number of segments for the current frame. 
-Therefore, at first attempt, the consumer tries to make a "best guess" at the number of segments needed to fetch, by issuing $M$ Interests (see Figure \ref{fig:pull}). If Interests arrive too early, they will be added to the producer's PIT and stay there for the amount of time $d_{gen}$ called \texttt{generation delay}. Once encoded frame is segmented into $N$ segments, these are published, and if $N\geq M$, Interests $0 - M$ are answered with the data which travels back to the consumer. Upon receiving first data segment, the consumer determines the total number of segments for the current frame, and issues $N - M$ more Interests for the missing segments (if any). These segments will be satisfied by data with no generation delay (as the frame has been published already by the producer). The time interval between receiving very first segment and when the frame is fully assembled is represented by $d_{asm}$ and called \texttt{assembling time}.
+The consumer does not know the total number of segments beforehand, unless the very first segment is fetched. In that case, the consumer can retrieve metadata from the received segment and acquire the total number of segments for the current frame. 
+Therefore, at first attempt, the consumer makes a "best guess" at the number of segments needed to fetch, by issuing $M$ Interests (see Figure \ref{fig:pull}). If Interests arrive too early, they will be added to the producer's PIT and stay there for the amount of time $d_{gen}$ called \texttt{generation delay}. Once the encoded frame is segmented into $N$ segments, these are published, and if $N\geq M$, Interests $0 - M$ are answered with the data which travels back to the consumer. Upon receiving the first data segment, the consumer determines the total number of segments for the current frame, and issues $N - M$ more Interests for the missing segments (if any). These segments will be satisfied by data with no generation delay (as the frame has been published already by the producer). The time interval between receiving the very first segment and when the frame is fully assembled is represented by $d_{asm}$ and called \texttt{assembling time}.
+
+%%The first two sentences of the previous paragraph don't add up. In that/this case? What case? The first segment is fetched or not?
 
 \begin{figure}[t!]
 \centering
@@ -260,13 +262,13 @@ Therefore, at first attempt, the consumer tries to make a "best guess" at the nu
 \label{fig:pull}
 \end{figure}
 
-Needless to say, additional round-trips for requesting missing data segments increase overall frame assembling time and chances that the frame will be incomplete by the time it should be played back. This problem could be avoided if the consumer is able to make better estimates of the number of initial Interests. Therefore, the following considerations were introduced in later versions of the library:
+Needless to say, additional round trips for requesting missing data segments increase overall frame assembling time and chances that the frame will be incomplete by the time it should be played back. This problem can be avoided if the consumer is able to make more accurate estimates of the number of initial Interests. Therefore, the following considerations were introduced in later versions of the library:
 \begin{itemize}
-\item consumer should know what type of frame is to be fetched (as average number of segments varies greatly for different frame types);
-\item consumer should track average number of segments per frame type.
+\item The consumer should know what type of frame is to be fetched (as average number of segments varies greatly for different frame types).
+\item The consumer should track the average number of segments per frame type.
 \end{itemize}
 
-The first consideration was implemented by introducing separate namespaces for key and delta frames. The second consideration helps consumers better estimate the number of initial interests.
+The first consideration was implemented by introducing separate namespaces for Key and Delta frames. The second consideration helps the consumer better estimate the number of initial Interests.
 
 \subsubsection{Buffering}
 
@@ -278,17 +280,21 @@ The first consideration was implemented by introducing separate namespaces for k
 % 	- assembling frames
 % - buffer-based retransmissions
 
-As in traditional streaming applications, consumer uses frame buffering in order to tackle out-of-order data arrivals and network delay deviations. Consumer-side jitter buffer is also used as a place for assembling frames by segments. However, the definition of jitter buffer is extended for NDN. In a traditional push-based approach, buffer can not contain empty frame slots; they are allocated/reserved only when data arrives. A pull-based paradigm requires consumers to request data explicitly. Therefore, after expressing an Interest, consumers "knows" that new data is coming, and a frame slot should be reserved in the buffer. Practically, this means that there will always be some number of reserved empty slots in the buffer. Thus, jitter buffer's size has two measurements:
+As in traditional streaming applications, the consumer uses frame buffering in order to tackle out-of-order data arrivals and network delay deviations. Consumer-side jitter buffer is also used as a place for assembling frames by segments. However, the definition of ``jitter buffer" is extended for NDN. In a traditional push-based approach, buffer can not contain empty frame slots; they are allocated/reserved only when data arrives. A pull-based paradigm requires the consumer to request data explicitly. Therefore, after expressing an Interest, the consumers ``knows" that new data is coming, and a frame slot should be reserved in the buffer. Practically, this means that there will always be some number of reserved empty slots in the buffer. Thus, jitter buffer's size has two measurements:
 \begin{itemize}[label={}]
 \item \textit{playback size} - playback duration of all complete ordered frames by the moment;
 \item \textit{estimated size} = \textit{playback size} + \textit{number of reserved slots} $\times$ 1/\textit{producer rate}.
 \end{itemize}
 
 The difference between estimated size and playback size ($RTT^{\prime}$) cannot be smaller than the current average RTT value. In fact, keeping this value at a minimum indicates that consumer receives the most recent data with the minimal amount of outstanding Interests. Monitoring this value over time may help consumer get a better clue on the ``sync" status with the producer. For example, consumer may use it during the fetching process, as will be discussed in the next section. 
+%% Correct formatting for($RTT^{\prime}$)?
 
 \subsubsection{Interest expression control}
 
-The key challenge in a consumer-driven model for videoconferencing is to \emph{ensure the consumer gets the latest data in a caching network}, without resorting to direct producer-consumer communication that would limit scaling. To get fresh data, which can be cached but should not be the newest available for the consumer's path,  the consumer cannot rely only on using such flags as \textit{AnswerOriginKind} and \textit{RightMostChild}. The high frequency nature of streaming data makes no guarantees that the data satisfying those flags received by a consumer will be the most recent one. Instead, it is necessary to use other indicators to ensure that the network supplies up-to-date stream data. The basic solution is to leverage the known segment publishing rate and assume, under normal operation, that a series of old, cached samples can be retrieved more quickly than new data. The inter-arrival delays ($D_{arr}$) of the most recent samples follow the publishers' generation pattern, but cached data will follow the Interest expression temporal pattern. Therefore, by monitoring inter-arrival delays of consequtive media samples, consumers can make educated assumptions about data freshness (see Figure \ref{fig:inter-arrival}).
+The key challenge in a consumer-driven model for videoconferencing is to \emph{ensure the consumer gets the latest data in a caching network}, without resorting to direct producer-consumer communication that would limit scaling. To get fresh data, which can be cached but should not be the newest available for the consumer's path, the consumer cannot rely only on using such flags as \textit{AnswerOriginKind} and \textit{RightMostChild}. The high frequency nature of streaming data makes no guarantees that the data satisfying those flags received by a consumer will be the most recent one. Instead, it is necessary to use other indicators to ensure that the network supplies up-to-date stream data. The basic solution is to leverage the known segment publishing rate and assume, under normal operation, that a series of old, cached samples can be retrieved more quickly than new data. The inter-arrival delays ($D_{arr}$) of the most recent samples follow the publishers' generation pattern, but cached data will follow the Interest expression temporal pattern. Therefore, by monitoring inter-arrival delays of consecutive media samples, consumers can make educated assumptions about data freshness (see Figure \ref{fig:inter-arrival}).
+
+%%The following sentences really don't make much sense: To get fresh data, which can be cached but should not be the newest available for the consumer's path, the consumer cannot rely only on using such flags as \textit{AnswerOriginKind} and \textit{RightMostChild}. The high frequency nature of streaming data makes no guarantees that the data satisfying those flags received by a consumer will be the most recent one.
+
 
 \begin{figure}[t!]
 \centering
@@ -314,11 +320,12 @@ During bootstrapping, the consumer ``chases" the producer and aims to exhaust ne
 \end{figure}
 
 
-$W$ provides a simple mechanism to speed up or slow down Interests expression. Any increase in $W$ value makes consumer issue more Interests (Figure \ref{fig:int-burst}), whereas decrease in $W$ holds consumer back from sending any new Interests (Figure \ref{fig:int-hold}). Larger values of $W$ make consumer reach synchronized state with the producer more quickly. However, a larger value means a larger number of outstanding Interests and larger $RTT^\prime$ because of longer generation delays $d_{gen}$ for each media sample. By adjusting the value of $W$ and observing inter-arrival delays $D_{arr}$ consumer can find minimal $RTT^\prime$ value while still getting non-cached data, thus achieving best synchronization state with the producer.
+$W$ provides a simple mechanism to speed up or slow down Interests expression. Any increase in $W$ value makes the consumer issue more Interests (Figure \ref{fig:int-burst}), whereas any decrease in $W$ holds the consumer back from sending any new Interests (Figure \ref{fig:int-hold}). Larger values of $W$ make the consumer reach a synchronized state with the producer more quickly. However, a larger value means a larger number of outstanding Interests and larger $RTT^\prime$ because of longer generation delays $d_{gen}$ for each media sample. By adjusting the value of $W$ and observing inter-arrival delays $D_{arr}$, the consumer can find minimal $RTT^\prime$ value while still getting non-cached data, thus achieving the best synchronization state with the producer.
+%% Interests' expression, Interests expression, Interest expression, etc.? 
 
 For more complex scenarios of video streaming, the consumer controls expression of ``batches" of Interests rather than individual Interests, because video frames are composed of several segments. In this case, $W$ is adjusted on a per-frame basis, rather than per-segment. In all other respects, the same logic (as above) can be applied.
 
-The bootstrapping phase starts with issuing Interest with enabled \textit{RightMostChild} selector, in delta namespace for audio and key namespace for video. The reason this process differs for video streams is that consumer is not interested in fetching delta frames without having corresponding key frame for decoding. Once initial data segment of sample with number $S_{seed}$ has been received, consumer initializes $W$ with initial value $N$ and asks for the next sample data $S_{seed}+1$ in the appropriate namespace. Upon receiveing first segments of sample $S_{seed}+1$, consumer initiates fetching process (described above) for all namespaces (delta and key, if available). This bootstrapping phase stops when consumer finds the minimal value of $W$ which still allows receiving the most recent data, i.e., consumer reaches synchronized state with the producer and switches to a normal fetching phase where no adjustments for $W$ are needed. 
+The bootstrapping phase starts with issuing an Interest with the enabled \textit{RightMostChild} selector, in Delta namespace for audio and Key namespace for video. The reason this process differs for video streams is that the consumer is not interested in fetching Delta frames without having corresponding Key frames for decoding. Once an initial data segment of a sample with number $S_{seed}$ has been received, the consumer initializes $W$ with initial value $N$ and asks for the next sample data $S_{seed}+1$ in the appropriate namespace. Upon receiving the first segments of sample $S_{seed}+1$, the consumer initiates the fetching process (described above) for all namespaces (Delta and Key, if available). This bootstrapping phase stops when the consumer finds the minimal value of $W$ which still allows receiving the most recent data, i.e., consumer reaches synchronized state with the producer and switches to a normal fetching phase where no adjustments for $W$ are needed. 
 % Listing \ref{lst:fetch-algo} shows pseudo-code for the bootstrapping phase.
 
 % \begin{algorithm}
@@ -369,7 +376,7 @@ The bootstrapping phase starts with issuing Interest with enabled \textit{RightM
 
 
 %\subsubsection{Application-level PIT}
-\textit{Application-level PIT.} In most cases, consumers aim to express Interests for the data not yet produced, to be immediately satisfied when data is produced. The current NDN-CPP library provides a producer-side Memory Content Cache implementation into which data is published. However, this is only useful when data has been published and put in the cache before Interest for this data has arrived. For the missing data, the Interest is forwarded to the producer application which stores it in internal pending interests table (PIT) unless requested data is ready. This functionality seems quite common for low-latency applications, and has now been incorporated into the NDN-CPP library implementation.
+\textit{Application-level PIT.} In most cases, consumers aim to express Interests for the data not yet produced, to be immediately satisfied when data is produced. The current NDN-CPP library provides a producer-side Memory Content Cache implementation into which data is published. However, this is only useful when data has been published and put in the cache before an Interest for this data has arrived. For the missing data, the Interest is forwarded to the producer application which stores it in the internal Pending Interests Table (PIT) unless requested data is ready. This functionality seems quite common for low-latency applications, and has now been incorporated into the NDN-CPP library implementation.
 
 \section{Implementation}
 \label{sec:imp}
@@ -383,12 +390,12 @@ Apart from the library, first desktop NDN videconferencing application \ndnconNa
 
 \section{Evaluation}
 \label{sec:eval} 
-In the course of this project, there were several iterations of architecture design that introduced successive improvements to the overall quality of the algorithms. They are described further in this section. Each iteration tackled problems revealed during tests, which were mostly taken in practice rather than simulated.
+During the course of this project, there were several architecture design iterations that introduced successive improvements in the overall quality of the algorithms. (These are described further in this section.) Each iteration tackled problems that were revealed during tests (mostly in practice rather than simulated).
 
 \subsection{Video streaming performance}
-Video streaming performance in previous versions of \ndnrtcName{} largely suffered from video "hiccups" effect even when tested on trivial one-hop topologies. The cause of this problem turned out to be inefficient frame fetching process.
+Video streaming performance in previous versions of \ndnrtcName{} largely suffered from video "hiccups", even when being tested on trivial one-hop topologies. The cause of this problem turned out to be an inefficient frame fetching process.
 
-As was described in previous sections, Key frames are usually much heavier than Delta frames and require more data segments for delivery. In early library versions, this differentiation was not reflected in producer's namespace which made consumer to pipeline equal number of initial interests ($M$ on Figure \ref{fig:pull}) for both frame types. This resulted in larger assembling times ($d_{asm}$) for the Key frames and additional round-trips of missing interests. Increased assembling time quite often caused skipping incomplete Key frames as they were not assembled by the time they should be played out. Eventually, all the consequent Delta frames were skipped as well which degraded overall video streaming experience by introducing video ``hiccup" effect.
+As described in previous sections, Key frames are usually much heavier than Delta frames and require more data segments for delivery. In early library versions, this differentiation was not reflected in the producer's namespace, which made consumer to pipeline equal number of initial interests ($M$ on Figure \ref{fig:pull}) for both frame types. This resulted in larger assembling times ($d_{asm}$) for the Key frames and additional round-trips of missing interests. Increased assembling time quite often caused skipping incomplete Key frames as they were not assembled by the time they should be played out. Eventually, all the consequent Delta frames were skipped as well which degraded overall video streaming experience by introducing video ``hiccup" effect.
 
 Having separate namespace for Key frames allowed consumer to maintain separate interest pipelines per frame type and collect historical data on the average number of interests required to fully retrieve one frame of each type in one round trip.
 

@@ -366,14 +366,16 @@ Apart from the library, first desktop NDN videconferencing application \ndnconNa
 
 \section{Evaluation}
 \label{sec:eval} 
-In the course of this project, there were several iterations of architecture design that introduced successive improvements to the overall quality of the algorithms. They are described further in this section. Each iteration tackles problems revealed during tests, which were mostly taken in practice rather than simulated.
+In the course of this project, there were several iterations of architecture design that introduced successive improvements to the overall quality of the algorithms. They are described further in this section. Each iteration tackled problems revealed during tests, which were mostly taken in practice rather than simulated.
 
-\subsection{Key namespace}
-As was described in previous sections, Key frames are usually much heavier than Delta frames and require more data segments for delivery. In early library versions, this differentiation was not reflected in producer's namespace which made consumer to pipeline equal number of initial interests ($M$ on Figure \ref{fig:pull}) for both frame types. This resulted in larger assembling times ($d_{asm}$) for the Key frames and additional round-trips of missing interests. Increased assembling time quite often caused skipping incomplete Key frames as they were not assembled by the time they should be played out. Eventually, all the consequent Delta frames were skipped as well which degraded overall video streaming experience by introducing video "hiccup" effect.
+\subsection{Video streaming performance}
+Video streaming performance in previous versions of \ndnrtcName{} largely suffered from video "hiccups" effect even when tested on trivial one-hop topologies. The cause of this problem turned out to be inefficient frame fetching process.
 
-Having separate namespace for Key frames allowed consumer to maintain separate interest pipelines per frame time and collect historical data on the average number of interests required to fully retrieve one frame of each type in one round trip.
+As was described in previous sections, Key frames are usually much heavier than Delta frames and require more data segments for delivery. In early library versions, this differentiation was not reflected in producer's namespace which made consumer to express equal number of initial interests ($M$ on Figure \ref{fig:pull}) for both frame types. This resulted in larger assembling times ($d_{asm}$) for the Key frames as additional round-trips for missing interests were required. This often caused skipping incomplete Key frames as they were not assembled by the time they should be played out. Eventually, all the consequent Delta frames were skipped as well (group of pcicture - GOP) which degraded overall video streaming experience and introduced video "hiccups" effect.
 
-\subsection{Audio bundling}
+Having separate namespace for Key frames allowed consumer to maintain separate interest pipelines per frame type and collect historical data on the average number of interests required to fully retrieve one frame of each type in one round trip.
+
+\subsection{Quality of experience}
 \begin{figure}[t!]
 \centering
 \begin{tiny}
@@ -386,17 +388,19 @@ Having separate namespace for Key frames allowed consumer to maintain separate i
 
 A series of tests were taken in order assess efficiency and quality of service compared to Skype calls. Each test was comprised of six runs of 2-person 5-minute conference talks using NdnCon (GUI conferencing application build atop \ndnrtcName{}):
 \begin{itemize}
-\item 3 runs of audio+video on low, medium and high qualities (0.5, 0.7 and 1.5 Mbit/s accordingly);
-\item 1 run of audio-only;
+\item 3 runs of audio+video with low, medium and high video bandwidths settings (0.5, 0.7 and 1.5 Mbit/s accordingly);
+\item 1 run of audio-only conference;
 \item 1 run of Skype audio+video conference;
-\item 1 run of Skype audio only conference.
+\item 1 run of Skype audio-only conference.
 \end{itemize}
 
-Tests were taken across existing NDN testbed between REMAP hub (aleph.ndn.ucla.edu) and six other hubs. Therefore, tests were covering both one-hop and multi-hop topologies.
+Tests were taken across existing NDN testbed between REMAP hub (aleph.ndn.ucla.edu) and six other hubs. Tests covered both one-hop and multi-hop (with several intermediate hubs) topologies.
 
 Figure \ref{fig:tests-skype} shows overall bitrate usage results. Firstly, whereas Skype has fully utilized link capacity between peers and delivered higher bitrate videos, NdnCon did not adjust to the current network conditions which makes feature of adaptive rate control highly desirable.
 
-Actual average bitrates are turned out to be slightly higher than pre-configured video streams (0.7, 0.9 and 1.8 Mbit/s) which can be explained by NDN packet overhead which is about 280-330 bytes large and account for $\approx$30\% of segment size (1000 bytes). Having such large overhead makes transferring audio samples in separate segments highly inefficient. Thus, further improvent to the algorithms was to bundle consecutive audio samples unless they fill the size of a segment. With 90 Kbit/s audio, approximately 5 audio samples can be added to 1000-bytes data segment. This improvement eventually reduced audio bandwith efficiently (and interests number on consumer side) and made it comparable to Skype ausio bandwiths.
+Actual average bitrates are turned out to be slightly higher than pre-configured video streams -- 0.7, 0.9 and 1.8 Mbit/s for low, medium and high bandwiths -- which can be explained by NDN packet overhead which is about 280-330 bytes large and account for $\approx$30\% of segment size (1000 bytes). Having such large overhead makes transferring audio samples in separate segments highly inefficient. Thus, further improvent to the algorithms was to bundle consecutive audio samples unless they fill the size of a segment. With 90 Kbit/s audio, approximately 5 audio samples can be added to 1000-bytes data segment. This improvement eventually reduced audio bandwith effectively (and interests number on consumer side) and made it comparable to Skype audio bandwidths.
+
+The overall user experience for these 2-person conferences was subjectively assessed as being higher than average - 3 points on a scale from 0 to 5 (Skype calls were taken as a 5-point user experiences).
 
 \subsection{Consumer-Producer synchronization}
 
@@ -407,11 +411,21 @@ Actual average bitrates are turned out to be slightly higher than pre-configured
 \label{fig:old-buf}
 \end{figure}
 
-In previous library versions, consumer "chased" producer by exhausting cached data and issuing large number of outstanding interests. However, there were no mechanism for consumer to figure out how early those interests are issued and whether interest expression should be postponed in order to eliminate timeouts. For two similar test runs (one-hop topology) the number of timed out interests and retransmissions could vary greatly (either $\approx$1\% or $\approx$50\%). The latter case happened due to incorrect consumer's synchronization with producer - interests were issued too early so that they were timed out before any data has been produced. This problem could be solved by increased interests' lifetime. However, for previous library versions, bufferization mechanism (see Figure \ref{fig:old-buf}) dictated interests' lifetime - in fact, in order to maintain re-transmission checkpoint, all interests entering the buffer should have lifetime equals half of the current buffer size. This approach resulted in unavoidable interests time outs in cases when consumer issued interests far too early before the actual data was produced.
+\begin{figure}[t!]
+\centering
 
-For the current version of the library, re-transmission check-point is placed at $RTT$ milliseconds from the end of the buffer ($J=RTT$ on the Figure \ref{fig:old-buf}), this, together with updated NFD retransmission streategy \cite{nfd-rtx}, alllowed larger interests lifetimes.
+\subfigure[$d_{gen} \approx 600ms$ resulted in 50\% retranmissions]{\includegraphics[width=0.4\textwidth]{dgen-bad}}
+\subfigure[$d_{gen} \approx 310ms$ - no redundant retransmissions]{\includegraphics[width=0.4\textwidth]{dgen-decent}}
 
-Moreover, the problem described above could not have happened if consumer would know that it issues interests too early. Chasing algorithm in older library versions was exhausting network cached in rather aggressive manner - interests were issued constantly unless they fill up the buffer. After that, frames would be consumed at producer's rate and more interests issued unless consumer reaches stable data arrivals. This approach lacks from any knowledge about issued interests and generation delay or $RTT`$ is not taken into account.
+\caption{Two separate runs of earlier library version on similar topology (one-hop): random results for data generation delay $d_{gen}$ due to poor consumer-producer synchornization}
+\label{fig:dgen}
+\end{figure}
+
+In previous library versions, consumer "chased" producer by exhausting cached data and issuing large number of outstanding interests. However, there was no mechanism for consumer to figure out how early those interests are issued and whether interest expression should be slowed down in order to eliminate timeouts due to data abscence. For two similar test runs (one-hop topology, see Figure \ref{fig:dgen}) the number of timed out interests and retransmissions could vary greatly (either $\approx$1\% or $\approx$50\%). The latter case happened due to incorrect consumer's synchronization with producer - interests were issued too early so that they were timed out before any data has been produced. This problem could be resolved by increased interests' lifetime. However, for previous library versions, bufferization mechanism (see Figure \ref{fig:old-buf}) dictated interests' lifetime - in fact, in order to maintain re-transmission checkpoint, all interests entering the buffer should have lifetime equals half of the current buffer size. This approach resulted in unavoidable interests time outs in cases when consumer issued interests far too early before the actual data was produced.
+
+For the current version of the library, re-transmission check-point is placed at $RTT$ milliseconds from the end of the buffer ($J=RTT$ on the Figure \ref{fig:old-buf}), this, together with updated NFD retransmission strategy \cite{nfd-rtx-release}, alllowed larger interests lifetimes.
+
+Moreover, the problem described above could not have happened if consumer would know that it issues interests too early. Chasing algorithm in older library versions was exhausting network cache too aggressively - interests were issued constantly unless they fill up the buffer. After that, frames were retrieved at producer's rate and more interests issued unless consumer starts to receive the most recent data. This approach lacks from any knowledge about issued interests and data generation delay and $RTT^\prime$ are not taken into account.
 
 \begin{figure}[t!]
 \centering
@@ -440,9 +454,21 @@ With introduction of $W$ concept, consumer have full control of the interest exp
 %How was the end-user quality of experience by the time the paper was written
 %What kinds of things did you add to support it. 
 
-\subsection{Scaling}
+\subsection{Community use}
 
-For now, there were few multi-peer tests conducted using NdnCon. The maximum number of participants involved in audio/video conference was four people, who were spread out accross 4 different campuses.
+\begin{figure}[t!]
+\centering
+
+\subfigure[NDN testbed utilization during biweekly NDN seminar]{\label{fig:one-to-many}\includegraphics[width=0.5\textwidth]{confbridge}}
+\subfigure[NDN testbed utilization during 4-peer call between UCLA, REMAP, WashU and Caida hubs]{\label{fig:many-to-many}\includegraphics[width=0.5\textwidth]{4peer}}
+
+\caption{NDN testbed utilization during one-to-many and many-to-many scenarios}
+\label{fig:testbed-utilization}
+\end{figure}
+
+Initial attempts of deploying NdnCon conferencing application for NDN Community were made in early 2015. NdnCon was used to stream NDN seminar over the existing NDN testbed. To do that, an audio/video bridge was set up using third-party tools like Soundflower and CamTwist Studio allowing to publish captured screen and audio feed from the seminar (taken in Cisco WebEX conferencing tool) over the NDN. Figure \ref{fig:one-to-many} shows NDN testbed utilization during 1-hour conference call. It is expected that media streams were consumed by 5 to 8 people. Overall quality was subjectively satisfying as reported by users.
+
+Another run was made in an attempt to test multi-party conferencing ability. This test included 4 peers each publishing 3 video streams and 1 audio stream and fetching 1 video and 1 audio stream from each of the other participants. Participants were distributed accross four campuses - UCLA, REMAP, CAIDA and WashU (Figure \ref{fig:many-to-many}). These results were subjectively satisfying, however for one user (connected to WashU hub), audio cut-offs happened more often than for the other participants. The root causes of this have not been revealed yet. Many-to-many test scenarious are complex and will be taken for future work.
 
 \section{Conclusion and Future Work}
 \label{sec:conclusion}

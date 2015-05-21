@@ -1,13 +1,22 @@
 \begin{thebibliography}{1}
 
-\bibitem{webrtc}
-May 2015.
-
 \bibitem{openfec}
-May 2015.
+\text{OpenFEC Library}.
+\newblock \url{http://openfec.org}.
+
+\bibitem{webrtc}
+\text{WebRTC Project}.
+\newblock \url{http://www.webrtc.org}.
 
 \bibitem{ndncon}
-May 2015.
+\text{NdnCon GiHub Repository}.
+\newblock \url{https://github.com/remap/ndncon}, September 2014.
+
+\bibitem{nfd-rtx-release}
+\text{NFD version 0.2.0 release notes}.
+\newblock
+  \url{http://named-data.net/doc/NFD/0.3.1/RELEASE_NOTES.html#nfd-version-0-2-0-changes-since-version-0-1-0},
+  August 2014.
 
 \bibitem{ndnvideo}
 J.~B. Derek~Kulinski.

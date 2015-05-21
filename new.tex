@@ -48,36 +48,33 @@
 
 %************************************************
 \abstract
-\ndnrtcName{} is a real-time videoconferencing library that uses Named Data Networking (NDN), a Future Internet Architecture . It was designed to provide an end-user experience similar to Skype or Google Hangouts, while taking advantage of the NDN architecture's data naming, signing, caching, and request aggregation. It demonstrates low-latency HD video communication on NDN, without direct producer-consumer coordination, enabling scaling to many consumers. Internally, it employs widely used open source components, including the WebRTC library, VP9 codec, and OpenFEC (forward error correction). This paper presents the design, implementation in C++, and testing of \ndnrtcName{} on the NDN testbed using a graphic conferencing application.
+\ndnrtcName{} is a real-time videoconferencing library that employs Named Data Networking (NDN), a proposed future Internet Architecture. It was designed to provide an end-user experience similar to Skype or Google Hangouts, while taking advantage of the NDN architecture's name-based forwarding, data signatures, caching, and request aggregation. It demonstrates low-latency HD video communication over NDN, without direct producer-consumer coordination, which enables scaling to many consumers through the capacity of the network rather than the capacity of the producer. Internally, it employs widely used open source components, including the WebRTC library, VP9 codec, and OpenFEC for forward error correction. This paper presents the design, implementation in C++, and testing of \ndnrtcName{} on the NDN testbed using a demonstration GUI conferencing application, \ndnconName{}.
 
 %************************************************
 \section{Introduction}
 % About NDN from the standpoint of content distribution.
-Named Data Networking (NDN) is a Future Internet Architecture that shifts from the current host-centered paradigm towards data-centered communication.~\cite{ndntechreport} In NDN, every chunk of data has a hierarchical name (often human-readable) which is used by routers to satisfy data requests called "interests". This data is also cached by routers and used to answer similar future requests. NDN's intrinsic caching ability can be leveraged by content distribution applications and significantly help to offload data publishers in multi-peer scenarios.
+Named Data Networking (NDN) is a proposed future Internet Architecture that shifts from the current host-centered paradigm of the IP Internet to data-centered communication. In NDN, every chunk of data has a hierarchical name, which can include human-readable components, and a cryptographic signature binding name, data, and the key of the publisher.  Consumers of data issue ``Interests" for these Data packets by name.  Named, signed packets matching the Interest can be returned by any node on the network, including routers. NDN's intrinsic caching can be leveraged by content distribution applications and significantly help to reduce the load on data publishers in multi-consumer scenarios.~\cite{ndnvideo}  Additionally, duplicate Interests for the same content can be aggregated in routers, further reducing the load on those publishers and the network. A full discussion of NDN is outside the scope of this paper; see the publications on the project website\footnote{http://named-data.net}, including~\cite{ndntechreport}.
 
 % About current low-latency applications and multi-party conferences.
-Low-latency audio/video conferencing applications often require establishing direct peer-to-peer communication channels, for the best user experience. They face implementation challenges and inefficiencies related to the connection-based approach currently used in most IP conferencing solutions. This lack of effectiveness is evident to anyone who has attempted to deliver duplicated media streams to nine people participating in a ten-party conference, for example.
+Efficient content distribution has long been a driver application for NDN research and the broader field of Information Centric Networking (ICN) as well.  We briefly discuss prior work in this area, including our own, in Section \ref{sec:bg}.  However, \emph{low-latency} application lists ``real-time conferencing'' presents some particular design and implementation challenges that have not been widely explored in publicly available prototypes or the NDN and ICN literature.   For example, obtaining the ``latest data'' from a network with pervasive caching, without relying on direct consumer-producer communication (which impacts scaling potential), while trying to keep application-level latency low, is challenging.
 
 % About this project and what it does
-\ndnrtcName{} has been designed and implemented to further develop and explore NDN's potential for scalable low-latency audio/video conferencing. \ndnrtcName{} provides basic functionality for publishing audio/video streams, and for fetching any streams being published which can be leveraged by desktop or web applications for establishing multi-party conferences. While NDN provides scalability advantages, \ndnrtcName{} ensures low-latency communication. It assures that data being fetched are the most recent data available on the network. \ndnrtcName{} is a C++ library which is built on top of WebRTC library, incorporating existing audio pipeline (including echo cancellation) and existing video codec (VP9).
+The \ndnrtcName{} library was created to explore this arena experimentally.  It was designed, implemented, and evaluated to explore NDN's potential for scalable low-latency audio/video conferencing and ``real-time'' traffic more generally. This paper presents the current design and initial evaluation.  \ndnrtcName{} provides basic functionality for publishing audio/video streams, and for fetching these streams with low latency.  This can be leveraged by desktop or web applications, such as the \ndnconName{} sample application, for establishing multi-party conferences. The NDN network's caching and interest aggregation are leveraged without architectural modification, with the \ndnrtcName{} library ensuring low-latency communication. 
+
+We are working towards the goal of using \ndnrtcName{} in NDN project videoconferences and meetings.  To be practically useful in project communications, we also needed reasonable CPU and bandwidth efficiency, echo cancellation, and  modern video coding: as a result, \ndnrtcName{} is a C++ library which is built on top of the widely used WebRTC library, incorporating its existing audio pipeline (including echo cancellation) and its video codec (VP9).
 
 The remainder of this paper is organized as follows: Section \ref{sec:bg} covers background and prior work. Section \ref{sec:goals} lists main project goals. Section \ref{sec:arch} describes architecture of the library, designed namespace, data structures and algorithms used. Section \ref{sec:imp} discusses implementation details. Section \ref{sec:eval} evaluates main outcomes. Section \ref{sec:future} addresses existing issues and future work. Finally, Section \ref{ref:conclusion} provides a conclusion.
 
 %************************************************
-\section{Background and prior work}
-\label{sec:bg}
-To the authors' knowledge, \ndnrtcName{} is one of the few applications with perceptual real-time requirements being tested on an Information Centric Networking platform over a multi-hop testbed. 
-
-A non-real time video-streaming software solution, NDNVideo \cite{ndnvideo}, was successfully tested and deployed on NDN, and proved high scalability. The project focused on developing random-access and live video for location-based and mixed reality applications. Another conferencing application (audio-only, however) was developed in \cite{act-tool}. It leveraged use of Mumble VoIP software, but used NDN as a transport. Initial effort for conference and user discovery was made in the recent work as well, suggesting that building on an existing, resilient platform is the best way to generate a usable application. Therefore, \ndnrtcName{} was chosen to be built on top of WebRTC library, in order to utilize its' audio-processing capabilities and video codecs, and potentially give an opportunity for easier integration with supported web-browsers.
-
-% cite DASH over NDN 
-% cite tech report from lixia's group (Ilya)
-% cite any others? 
-
-%************************************************
 \section{Design Objectives}
 \label{sec:goals}
-The NDN project team uses application-driven research to explore NDN's affordances for modern applications and to refine the architecture itself.  Initial goals of the \ndnrtcName{} project are to explore low-latency audio/video communication over NDN, and to provide a multi-party conferencing application which can be used by NDN project team members across existing NDN testbeds. Additionally, this should be used as a traffic generator application for future research of NDN routing algorithms, congestion control, and general testing of the network architecture principles.
+The NDN project team uses application-driven research to explore NDN's affordances for modern applications and to refine the architecture itself.  Though it is based on what we learned from the NDNVideo project~\cite{ndnvideo}, \ndnrtcName{} is a clean slate design with new goals.  The initial objectives of the \ndnrtcName{} project are to explore \emph{low-latency} audio/video communication over NDN, and to provide a working multi-party conferencing application that can be used by NDN project team members across existing NDN testbeds.  At the same time, we attempt to preserve network-supported scalability by avoiding direct consumer-producer communication (e.g., Interests that require new Data to be generated by the producer for each request).  
+
+Over IP, low-latency audio/video conferencing applications typically establish direct peer-to-peer communication channels, for the best user experience. However, they face implementation challenges and inefficiencies related to the connection-based approach currently used in most IP conferencing solutions.  Existing solutions scale poorly to high numbers of producers and consumers without dedicated aggregation units, for example. 
+%% say more
+%This lack of effectiveness is evident to anyone who has attempted to deliver duplicated media streams to nine people participating in a ten-party conference, for example.
+
+
 \begin{itemize}
 \item \textbf{Low-latency audio/video communication.} Library should be capable of maintaining low-latency (150-300ms) communication for audio and video, similar to driver applications such as Skype, WebEX and Google Hangouts.
 
@@ -89,6 +86,23 @@ The NDN project team uses application-driven research to explore NDN's affordanc
 
 \item \textbf{Encryption-based access control.}   (Not implemented in this version.)
 \end{itemize} 
+
+
+%************************************************
+\section{Background and prior work}
+\label{sec:bg}
+To the authors' knowledge, \ndnrtcName{} is one of the few applications with perceptual real-time requirements being tested on an Information Centric Networking platform over a multi-hop testbed. 
+
+A non-real time video-streaming software solution, NDNVideo \cite{ndnvideo}, was successfully tested and deployed on NDN, and proved high scalability. The project focused on developing random-access and live video for location-based and mixed reality applications. Another conferencing application (audio-only, however) was developed in \cite{act-tool}. It leveraged use of Mumble VoIP software, but used NDN as a transport. Initial effort for conference and user discovery was made in the recent work as well, suggesting that building on an existing, resilient platform is the best way to generate a usable application. Therefore, \ndnrtcName{} was chosen to be built on top of WebRTC library, in order to utilize its' audio-processing capabilities and video codecs, and potentially give an opportunity for easier integration with supported web-browsers.
+
+% cite DASH over NDN 
+% cite tech report from lixia's group (Ilya)
+% cite any others? 
+% See my recent email.
+% Need to also cite the buffer fill paper, etc. 
+
+
+
 
 %************************************************
 \section{Application Architecture}

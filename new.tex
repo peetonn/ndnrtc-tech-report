@@ -301,13 +301,15 @@ The similar process used for fetching audio, though for now, audio bundles are r
 % 	- assembling frames
 % - buffer-based retransmissions
 
-As in sender-driven delivery, the consumer uses a ``jitter buffer" in order to manage out-of-order data arrivals and variations in network delay, and as a place to assemble segments into frames (see Figure \label{fig:old-buf}). However, the role of such a ``jitter buffer"  has some NDN-specific aspects. In sender-based video delivery, buffer slots can be allocated only when data arrives. A pull-based paradigm requires the consumer to request data by name explicitly, however. Therefore, after expressing an Interest, the consumer ``knows" that new data is coming, and a frame slot should be reserved in the buffer. Practically, this means that there will always be some number of reserved empty slots in the buffer. Thus, the \ndnrtcName{} jitter buffer's size is expressed in terms of two values measured in milliseconds: its \textit{playback size} is the playback duration in milliseconds of all complete ordered frames by the moment of retrieveing next frame from the buffer; its \textit{estimated size} is \textit{playback size} + \textit{number of reserved slots} $\times$ 1/\textit{producer rate} which reflects an estimated size of the buffer in case if all reserved slots have data (this corresponds to the theoretical unreal case when interests are answered instantly).
+As in sender-driven delivery, the consumer uses a ``jitter buffer" in order to manage out-of-order data arrivals and variations in network delay, and as a place to assemble segments into frames (see Figure \ref{fig:old-buf}). However, the role of such a ``jitter buffer"  has some NDN-specific aspects. In sender-based video delivery, buffer slots can be allocated only when data arrives. A pull-based paradigm requires the consumer to request data by name explicitly, however. Therefore, after expressing an Interest, the consumer ``knows" that new data is coming, and a frame slot should be reserved in the buffer. Practically, this means that there will always be some number of reserved empty slots in the buffer. Thus, the \ndnrtcName{} jitter buffer's size is expressed in terms of two values measured in milliseconds: its \textit{playback size} is the playback duration in milliseconds of all complete ordered frames by the moment of retrieveing next frame from the buffer; its \textit{estimated size} is \textit{playback size} + \textit{number of reserved slots} $\times$ 1/\textit{producer rate} which reflects an estimated size of the buffer in case if all reserved slots have data (this corresponds to the theoretical unreal case when interests are answered instantly).
 
 The difference between estimated buffer size and playback size corresponds to the effective RTT, which we call $RTT^{\prime}$ (this cannot be smaller than the actual network RTT value). %Minimal $RTT^{\prime}$ value indicates that consumer receives the most recent data for the least amount of outstanding Interests. %% NOT CLEAR WHAT THIS MEANS 
 %% PG: actually it's not entirely true - minimal RTT' could also mean that consumer is getting cached data...
 Monitoring this value over times provides the consumer information on possible ``sync" status with the producer as will be described further. %% HOW?. PG: described futher 
 %For example, the consumer may use it during the fetching process, as will be discussed in the next section. 
 %% Correct formatting for($RTT^{\prime}$)?
+
+Another role played by the ``jitter buffer" is the retransmission control. As presented on Figure \ref{fig:old-buf}, at some point inside the buffer ($J$ milliseconds from the buffer end) there is a checkpoint, where every frame is being checked for completeness. In such cases, when incomplete frame can not be recovered using available parity data, Interests for the missing segments are re-issued.
 
 \subsubsection{Interest expression control}
 
@@ -433,7 +435,7 @@ The library distribution also comes with a simple console application which demo
 
 Some features were incorporated into the library based on our experience in this application.
 % Should discuss memory content cache?
- In most cases, consumers aim to express Interests for the data not yet produced, to be immediately satisfied when data is produced. The current NDN-CPP library provides a producer-side Memory Content Cache implementation into which data is published. However, this is only useful when data has been published and put in the cache before an Interest for this data has arrived. For the missing data, the Interest is forwarded to the producer application which stores it in the internal Pending Interests Table (PIT) unless requested data is ready. This functionality seems quite common for low-latency applications, and has now been incorporated into the NDN-CPP library implementation.
+In most cases, consumers aim to express Interests for the data not yet produced, to be immediately satisfied when data is produced. The current NDN-CPP library provides a producer-side Memory Content Cache implementation into which data is published. However, this is only useful when data has been published and put in the cache before an Interest for this data has arrived. For the missing data, the Interest is forwarded to the producer application which stores it in the internal Pending Interests Table (PIT) unless requested data is ready. This functionality seems quite common for low-latency applications, and has now been incorporated into the NDN-CPP library implementation.
 
 In addition to the library, the first desktop NDN videconferencing application \ndnconName{} \cite{ndncon} was implemented on top of \ndnrtcName{}. It provides a convenient UI for publishing and fetching media streams, text chat, and organizing multi-party audio/video conferences. It was used, along with a command-line interface for the evaluation below.
 
@@ -456,15 +458,6 @@ Figure \ref{fig:tests-skype} shows overall bitrate usage results. Whereas Skype 
 
 Actual average bitrates turned out to be slightly higher than pre-configured video streams -- 0.7, 0.9 and 1.8 Mbit/s for low, medium and high bandwidths respectively-- which can be explained by NDN packet overhead which is approximately 280-330 bytes and accounts for $\approx$30\% of the segment size (1000 bytes). Having such large overhead makes transferring audio samples in separate segments highly inefficient. Thus, further improvements to the algorithms were made by bundling consecutive audio samples unless they filled the size of a segment. With 90 Kbit/s audio, approximately five audio samples can be added to a 1000-bytes data segment. Eventually, this improvement effectively reduced audio bandwidth(and the number of Interests on the consumer side), making it comparable to Skype audio bandwidths.
 
-%The overall user experience for these 2-person conferences was subjectively assessed as being higher than average - 3 points on a scale from 0 to 5 (Skype calls were taken as 5-point user experiences).
-%%% I would not include this. 
-
-The results of such testing influenced iterative updates to the design, two of which are described below. 
-
-\paragraph{Separation of key and delta frame namespaces}. Video streaming performance in early versions of \ndnrtcName{} suffered from video ``hiccups", even when being tested on trivial one-hop topologies. The cause of this problem turned out to be an inefficient frame fetching process.
-As described in previous sections, key frames are much larger than delta frames and require more data segments for delivery. In early \ndnrtcName{} versions, this differentiation was not reflected in the producer's namespace, which made consumer to pipeline equal number of initial Interests ($M$ on Figure \ref{fig:pull}) for both frame types. This resulted in larger assembling times ($d_{asm}$) for the key frames and additional round trips of missing Interests. Increased assembling time quite often caused skipping incomplete key frames, as they were not assembled by the time they should have been played out. Eventually, all the subsequent delta frames were skipped as well, which degraded the overall video streaming experience by introducing the video ``hiccup" effect. Having a separate namespace for key frames enables consumers to maintain separate Interest pipelines per frame type and collect historical data on the average number of Interests required to retrieve one frame of each type in one round trip.
-%%which made consumer to pipeline equal number of initial Interests--- this makes little sense to me, if any.
-\subsection{Quality of experience}
 \begin{figure}[t!]
 \centering
 \begin{tiny}
@@ -474,6 +467,19 @@ As described in previous sections, key frames are much larger than delta frames 
 \caption{2-peer conference tests compared to Skype}
 \label{fig:tests-skype}
 \end{figure}
+
+%The overall user experience for these 2-person conferences was subjectively assessed as being higher than average - 3 points on a scale from 0 to 5 (Skype calls were taken as 5-point user experiences).
+%%% I would not include this. 
+
+The results of such testing influenced iterative updates to the design, two of which are described below. 
+
+\paragraph{Separation of key and delta frame namespaces} Video streaming performance in early versions of \ndnrtcName{} suffered from video ``hiccups", even when being tested on trivial one-hop topologies. The cause of this problem turned out to be an inefficient frame fetching process.
+As described in previous sections, key frames are much larger than delta frames and require more data segments for delivery. In early \ndnrtcName{} versions, this differentiation was not reflected in the producer's namespace and consumer has to issue equal number of initial Interests ($M$ on Figure \ref{fig:pull}) regardless of the frame type. This resulted in additional round trips of missing Interests and, consequently, larger assembling times ($d_{asm}$) for key frames. Increased assembling time quite often caused skipping incomplete key frames, as they were not assembled by the time they should have been played out. Eventually, all the subsequent delta frames were skipped as well, which degraded the overall video streaming experience by introducing the video ``hiccup" effect. Having a separate namespace for key frames enables consumers to maintain separate Interest pipelines per frame type and collect historical data on the average number of Interests required to retrieve one frame of each type in one round trip.
+%%which made consumer to pipeline equal number of initial Interests--- this makes little sense to me, if any.
+%% PG: tried to rephrase...
+
+%\subsection{Quality of experience}
+% PG: moved figure to the previous section
 
 
 \subsection{Consumer-Producer synchronization}
@@ -495,7 +501,7 @@ As described in previous sections, key frames are much larger than delta frames 
 \label{fig:dgen}
 \end{figure}
 
-\paragraph{Bootstrap behavior.} In previous library versions, the consumer ``chased" the producer's time-series data by exhausting cached data and issuing a large number of outstanding Interests. However, there was no mechanism for the consumer to figure out how early those Interests are issued and whether Interest expression should be postponed in order to eliminate time outs. For two similar test runs (one-hop topology), the number of timed out Interests and re-transmissions varied greatly (either $\approx$1\% or $\approx$50\%). One was due to an incorrect consumer's synchronization with the producer; Interests were issued too early, so they timed out before any data had been produced. This problem can be solved by increasing the Interests' lifetime. However, for previous library versions, the mechanism for buffering (see Figure \ref{fig:old-buf}) dictated the Interests' lifetime. In fact, in order to maintain the re-transmission checkpoint, all Interests entering the buffer had a lifetime equal to half of the current buffer size. This approach resulted in unavoidable Interest time outs, in the cases when the consumer issued Interests far too early (before the actual data was produced).
+\paragraph{Bootstrap behavior} In previous library versions, the consumer ``chased" the producer's time-series data by exhausting cached data and issuing a large number of outstanding Interests. However, there was no mechanism for the consumer to figure out how early those Interests are issued and whether Interest expression should be postponed in order to eliminate time outs. For two similar test runs (one-hop topology), the number of timed out Interests and re-transmissions varied greatly (either $\approx$1\% or $\approx$50\%). One was due to an incorrect consumer's synchronization with the producer; Interests were issued too early, so they timed out before any data had been produced. This problem can be solved by increasing the Interests' lifetime. However, for previous library versions, the mechanism for buffering (see Figure \ref{fig:old-buf}) dictated the Interests' lifetime. In fact, in order to maintain the re-transmission checkpoint, all Interests entering the buffer had a lifetime equal to half of the current buffer size. This approach resulted in unavoidable Interest time outs, in the cases when the consumer issued Interests far too early (before the actual data was produced).
 
 For the current version of the library, the re-transmission checkpoint is placed at $RTT$ milliseconds from the end of the buffer ($J=RTT$ on the Figure \ref{fig:old-buf}). This, together with an updated NFD re-transmission strategy \cite{nfd-rtx-release}, allows for larger Interests' lifetimes.
 
@@ -516,6 +522,7 @@ Moreover, the problem described above can not occur if the consumer knows that i
 \end{figure}
 
 With the introduction of the $W$ concept, the consumer has full control of the Interest expression. Figure \ref{fig:ws} shows how a larger value of $W$ helps to exhaust the cache more quickly. The number of outstanding Interests is controlled by a consumer and directly influences how fast consumer can ``chase" the producer. Thus, the consumer can control the ``agressiveness" of cache exhaustion directly.
+%% PG: removed these sentences as they duplicate "Interest expression control" section
 %The $W$ concept allows a ``lazy" start for the consumer. By specifying a smaller $W$, the consumer issues less Interests. Further, the consumer observes cache exhaustion by monitoring $D_{arr}$ and, if the cache has not been exhausted during allocated time, the consumer may increase the value of $W$ in order to express more Interests. Similarly, the consumer may opt to decrease $W$ in cases where the original value resulted in behaviour that is too aggressive.
 
 %\subsection{Test setup} 
@@ -545,8 +552,9 @@ With the introduction of the $W$ concept, the consumer has full control of the I
 
 Initial attempts of deploying the NdnCon conferencing application for the NDN Community were made in early 2015. NdnCon was used to stream an NDN seminar over the existing NDN testbed. An audio/video bridge was set up using third-party tools, such as Soundflower and CamTwist Studio, allowing captured screen and audio feeds (taken in the Cisco WebEX conferencing tool). Figure \ref{fig:one-to-many} shows NDN testbed utilization during the one-hour conference call. It is estimated that media streams were consumed by five to eight people. Overall quality was satisfying, as reported by users.
 
-Another attempt to test multi-party conferencing ability included four peers, each publishing three video streams and one audio stream and fetching one video and one audio stream from each of the other participants. Participants were distributed across four campuses - UCLA, REMAP, CAIDA and WashU (Figure \ref{fig:many-to-many}). These results were also generally satisfying. However, for one user (connected to the WashU hub), audio cutoffs occurred more often than for the other participants. The root causes of this have yet to be revealed. Many-to-many test scenarios are complex, and will be included in future work.
+Another attempt to test multi-party conferencing ability included four peers, each publishing three video streams and one audio stream and fetching one video and one audio stream from each of the other participants. Participants were distributed across four NDN testbed hubs - UCLA, REMAP, CAIDA and WashU (Figure \ref{fig:many-to-many}). These results were also generally satisfying. However, for one user (connected to the WashU hub), audio cutoffs occurred more often than for the other participants. The root causes of this have yet to be revealed. Many-to-many test scenarios are complex, and will be included in future work.
 %%UCLA and REMAP? Or is there some clarification needed here?
+%% PG: these are actually NDN testbed hubs, I've edited text
 
 \section{Conclusion and Future Work}
 \label{sec:conclusion}

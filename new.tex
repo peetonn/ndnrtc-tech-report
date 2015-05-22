@@ -227,7 +227,7 @@ Packet-level metadata is applied to video as a header prepended to each segment 
 %%%% The following paragraph may be a little controversial
 %%%% You should clarify whether consumers that do not issue the 
 %%%% specific interest reported can really make use of it
-%%
+%% PG: if nonce value does not bleong to the interest issued by consumer, this data does not make any sense for this consumer
 Additionally, as an aid to experimentation and for optimizing two-way conversations, the header also carries the producer's observations of Interest arrival that can be used by consumers to hint fetching and playback choices.  The following make use of the Interest nonce value (and thus may not be as useful in larger multi-party calls): 
 \begin{itemize} [label={}]
 \item \textit{Interest nonce}: Nonce of the Interest which \textit{first} requested this particular segment. There are three meaningful cases:  1) \textit{Value belongs to the Interest issued previously} - consumer received non-cached data requested by previously issued Interest; 2) \textit{Value is non-zero, but it does not belong to any of the previously issued Interests} - consumer received data requested by some other consumer; data may be cached; 3) \textit{Value is zero} - consumer received data which were cached on the producer side and never requested by anyone previously.
@@ -235,6 +235,7 @@ Additionally, as an aid to experimentation and for optimizing two-way conversati
 \item \textit{Generation delay}: Time interval in milliseconds between Interest arrival and segment publishing. A consumer can use this value in order to control the number of outstanding Interests. This value is only valid when the nonce value belongs to one of the consumer's Interests.
 \end{itemize}
 
+However, this data will not make any sense for the consumers who did not issue Interest with the nonce value stored in this data packet.
 
 %% The following paragraphs is relocated and was unclear
 
@@ -300,11 +301,12 @@ The similar process used for fetching audio, though for now, audio bundles are r
 % 	- assembling frames
 % - buffer-based retransmissions
 
-As in sender-driven delivery, the consumer uses a ``jitter buffer" in order to manage out-of-order data arrivals and variations in network delay, and as a place to assemble segments into frames. However, the role of such a ``jitter buffer"  has some NDN-specific aspects. In sender-based video delivery, buffer slots can be allocated only when data arrives. A pull-based paradigm requires the consumer to request data by name explicitly, however. Therefore, after expressing an Interest, the consumers ``knows" that new data is coming, and a frame slot should be reserved in the buffer. Practically, this means that there will always be some number of reserved empty slots in the buffer. Thus, the \ndnrtcName{} jitter buffer's size is expressed in terms of two values measured in milliseconds: its  \textit{playback size} is the playback duration in milliseconds of all complete ordered frames by the moment of retrieveing next frame from the buffer; its \textit{estimated size} is \textit{playback size} + \textit{number of reserved slots} $\times$ 1/\textit{producer rate}.
+As in sender-driven delivery, the consumer uses a ``jitter buffer" in order to manage out-of-order data arrivals and variations in network delay, and as a place to assemble segments into frames (see Figure \label{fig:old-buf}). However, the role of such a ``jitter buffer"  has some NDN-specific aspects. In sender-based video delivery, buffer slots can be allocated only when data arrives. A pull-based paradigm requires the consumer to request data by name explicitly, however. Therefore, after expressing an Interest, the consumer ``knows" that new data is coming, and a frame slot should be reserved in the buffer. Practically, this means that there will always be some number of reserved empty slots in the buffer. Thus, the \ndnrtcName{} jitter buffer's size is expressed in terms of two values measured in milliseconds: its \textit{playback size} is the playback duration in milliseconds of all complete ordered frames by the moment of retrieveing next frame from the buffer; its \textit{estimated size} is \textit{playback size} + \textit{number of reserved slots} $\times$ 1/\textit{producer rate} which reflects an estimated size of the buffer in case if all reserved slots have data (this corresponds to the theoretical unreal case when interests are answered instantly).
 
-The difference between estimated buffer size and playback size corresponds to the effective RTT, which we call $RTT^{\prime}$.  (This cannot be smaller than the actual network RTT value.) Minimizing $RTT^{\prime}$ indicates that consumer receives the most recent data for the leeast amount of outstanding Interests. %% NOT CLEAR WHAT THIS MEANS
-Monitoring this value over times provides the consumer information on possible ``sync" status with the producer. %% HOW? 
-For example, the consumer may use it during the fetching process, as will be discussed in the next section. 
+The difference between estimated buffer size and playback size corresponds to the effective RTT, which we call $RTT^{\prime}$ (this cannot be smaller than the actual network RTT value). %Minimal $RTT^{\prime}$ value indicates that consumer receives the most recent data for the least amount of outstanding Interests. %% NOT CLEAR WHAT THIS MEANS 
+%% PG: actually it's not entirely true - minimal RTT' could also mean that consumer is getting cached data...
+Monitoring this value over times provides the consumer information on possible ``sync" status with the producer as will be described further. %% HOW?. PG: described futher 
+%For example, the consumer may use it during the fetching process, as will be discussed in the next section. 
 %% Correct formatting for($RTT^{\prime}$)?
 
 \subsubsection{Interest expression control}
@@ -347,9 +349,6 @@ In order to control Interest expression, a concept of ``\wConcept{}" (further is
 \caption{Managing Interest expression}
 \label{fig:w-concept}
 \end{figure}
-
-%% PG:
-%% TODO: review section 6.3 last paragraph for duplication of the paragraph below
 
 However inspired by TCP congestion window, \wConcept{} concept bears its own meaning for ICN networks. $W$ is controlled by the consumer and directly influences how fast consumer can echaust the cache. Every time a new Interest is expressed, $W$ is decremented, and when new data arrives, $W$ is incremented, thus allowing the consumer to issue more Interests. Even though, the consumer may opt to change \wConcept{} in some cases as discussed below, Interest expression is driven by the incoming data.
 
@@ -482,7 +481,7 @@ As described in previous sections, key frames are much larger than delta frames 
 \begin{figure}[t!]
 \centering
 \includegraphics[width=0.5\textwidth]{buffer}
-\caption{Bufferization in earlier library versions}
+\caption{Frame buffer}
 \label{fig:old-buf}
 \end{figure}
 
@@ -516,7 +515,8 @@ Moreover, the problem described above can not occur if the consumer knows that i
 \label{fig:ws}
 \end{figure}
 
-With the introduction of the $W$ concept, the consumer has full control of the Interest expression. Figure \ref{fig:ws} shows how a larger value of $W$ helps to exhaust the cache more quickly. The number of outstanding Interests is controlled by a consumer and directly influences how a faster consumer can ``chase" the producer. Every time a new Interest is expressed, $W$ is decremented, and when new data arrives, $W$ is incremented, thus allowing the consumer to issue more Interests. The $W$ concept allows a ``lazy" start for the consumer. By specifying a smaller $W$, the consumer issues less Interests. Further, the consumer observes cache exhaustion by monitoring $D_{arr}$ and, if the cache has not been exhausted during allocated time, the consumer may increase the value of $W$ in order to express more Interests. Similarly, the consumer may opt to decrease $W$ in cases where the original value resulted in behaviour that is too aggressive.
+With the introduction of the $W$ concept, the consumer has full control of the Interest expression. Figure \ref{fig:ws} shows how a larger value of $W$ helps to exhaust the cache more quickly. The number of outstanding Interests is controlled by a consumer and directly influences how fast consumer can ``chase" the producer. Thus, the consumer can control the ``agressiveness" of cache exhaustion directly.
+%The $W$ concept allows a ``lazy" start for the consumer. By specifying a smaller $W$, the consumer issues less Interests. Further, the consumer observes cache exhaustion by monitoring $D_{arr}$ and, if the cache has not been exhausted during allocated time, the consumer may increase the value of $W$ in order to express more Interests. Similarly, the consumer may opt to decrease $W$ in cases where the original value resulted in behaviour that is too aggressive.
 
 %\subsection{Test setup} 
 

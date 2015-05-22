@@ -24,6 +24,7 @@
 
 \newcommand{\ndnrtcName}{NDN-RTC} % {\emph{ndnrtc}}
 \newcommand{\ndnconName}{NdnCon}
+\newcommand{\wConcept}{Interest demand}
 
 %% Shrink lists - http://tex.stackexchange.com/questions/43743/how-to-reduce-line-space-leading-within-an-enumerate-environment 
 \setenumerate{itemsep=-0.5ex,topsep=1ex, leftmargin=*}
@@ -326,14 +327,16 @@ Our initial solution is to leverage the known segment publishing rate, which is 
 \label{fig:inter-arrival}
 \end{figure}
 
-%% What is bootstrapping? 
-%%
-During bootstrapping, the consumer ``chases" the producer and aims to exhaust network cache of historical (non-real time) segments. By increasing the number of outstanding Interests, the consumer ``pulls cached data" out of the network, unless the freshest data begin to arrive. In order to control Interest expression, a concept of $W$ (roughly an ``Interest window") is introduced (see Figure \ref{fig:w-concept}). It expresses Interests only when $W > 0$. At every moment, $W$ indicates how many outstanding Interests can be sent. Before the bootstrapping phase, the consumer initializes $W$ with a value which reflects the consumer's estimate of how many Interests are needed in order to exhaust network cache and reach the most recent data. 
+The consumer operates in two modes. The \textit{bootstrapping mode} is active when consumer initiates data fetching and tries to exhaust cached data by changing the number of outstanding Interests. After the consumer has exhausted the cache, it switches into the \textit{playback mode} and expresses Interests at the constant rate.
+
+During bootstrapping, the consumer ``chases" the producer and aims to exhaust network cache of historical (non-real time) segments. By increasing the number of outstanding Interests, the consumer ``pulls cached data" out of the network, unless the freshest data begin to arrive. 
+
+In order to control Interest expression, a concept of ``\wConcept{}" (further is referenced by variable $W$) is introduced (see Figure \ref{fig:w-concept}). The consumer expresses new Interests only when the demand is positive, i.e. $W > 0$. At every moment, $W$ indicates how many outstanding Interests should be sent. Before the bootstrapping phase, the consumer initializes $W$ with a value which reflects the consumer's estimate of how many Interests are needed in order to exhaust network cache and reach the most recent data.  
 
 \begin{figure}[t!]
 \centering
 
-\subfigure[$W$ concept]{\includegraphics[width=0.35\textwidth]{w-concept}}
+\subfigure[``\wConcept{}" concept, $W$]{\includegraphics[width=0.35\textwidth]{w-concept}}
 \subfigure[Interests bursting ($W+3$)]{\label{fig:int-burst}\includegraphics[width=0.35\textwidth]{int-burst}}
 \subfigure[Interests withholding ($W-3$)]{\label{fig:int-hold}\includegraphics[width=0.35\textwidth]{int-hold}}
 
@@ -341,13 +344,25 @@ During bootstrapping, the consumer ``chases" the producer and aims to exhaust ne
 \label{fig:w-concept}
 \end{figure}
 
+%% PG:
+%% TODO: review section 6.3 last paragraph for duplication of the paragraph below
 
-During playback, $W$ provides a simple mechanism to speed up or slow down Interest expression. Any increase in $W$ value makes the consumer issues more Interests (Figure \ref{fig:int-burst}), whereas any decrease in $W$ holds the consumer back from sending any new Interests (Figure \ref{fig:int-hold}). Larger values of $W$ make the consumer reach a synchronized state with the producer more quickly. However, a larger value means a larger number of outstanding Interests and larger $RTT^\prime$ because of longer generation delays $d_{gen}$ for each media sample. By adjusting the value of $W$ and observing inter-arrival delays $D_{arr}$, the consumer can find minimal $RTT^\prime$ value while still getting non-cached data, thus achieving the best synchronization state with the producer.
-%% Interests' expression, Interests expression, Interest expression, etc.? 
+However inspired by TCP congestion window, \wConcept{} concept bears its own meaning for ICN networks. $W$ is controlled by the consumer and directly influences how fast consumer can echaust the cache. Every time a new Interest is expressed, $W$ is decremented, and when new data arrives, $W$ is incremented, thus allowing the consumer to issue more Interests. Even though, the consumer may opt to change \wConcept{} in some cases as discussed below, Interest expression is driven by the incoming data.
 
-For more complex scenarios of video streaming, the consumer controls expression of ``batches" of Interests rather than individual Interests, because video frames are composed of several segments. In this case, $W$ is adjusted on a per-frame basis, rather than per-segment. In all other respects, the same logic (as above) can be applied.
+In current design, there are two indicators which reason any changes to the $W$  - effective $RTT$ ($RTT^\prime$) and inter-arrival delay ($D_{arr})$. Whenever $D_{arr}$ stops to fluctuate outrageously and begin to deviate around constant value, that means that consumer receives the freshest data available. However, it does not necessarily mean that the consumer issues Interests efficiently. Figure \ref{fig:ws10} shows that even though the consumer has exhausted cache rather quickly, $RTT^\prime$ is three times larger than the actual $RTT$ for the network (100ms), which means that the majority of the issued Interests remain pending whlie waiting for the requested data to be produced.
 
-The bootstrapping phase starts with issuing an Interest with the enabled \textit{RightMostChild} selector, in Delta namespace for audio and Key namespace for video. The reason this process differs for video streams is that the consumer is not interested in fetching Delta frames without having corresponding Key frames for decoding. Once an initial data segment of a sample with number $S_{seed}$ has been received, the consumer initializes $W$ with initial value $N$ and asks for the next sample data $S_{seed}+1$ in the appropriate namespace. Upon receiving the first segments of sample $S_{seed}+1$, the consumer initiates the fetching process (described above) for all namespaces (Delta and Key, if available). This bootstrapping phase stops when the consumer finds the minimal value of $W$ which still allows receiving the most recent data, i.e., consumer reaches synchronized state with the producer and switches to a normal fetching phase where no adjustments for $W$ are needed. 
+The consumer makes several iterative attempts to adjust the $W$ while bootstrapping which can be described as follows:
+
+\begin{enumerate}
+\item The consumer initializes default \wConcept{} $DW$ for some value, sets $W=DW$ and initiates Interests expression.
+\item If the consumer did not receive freshest data during allocated time (1000ms), increase \wConcept{}: $W=W+0.5DW; DW = DW+0.5DW$.
+\item \label{decrease-w} Whenever consumer receives freshest data (cache exhausted), decrease \wConcept{}: $W=W-0.5DW; DW = DW-0.5DW$ and wait for either of the two possible outcomes:
+\begin{itemize}
+\item $RTT^\prime$ decreases and the consumer still receives the freshest data -- go to step \ref{decrease-w};
+\item the consumer starts to get cached data ($D_{arr}$ fluctuates greatly) -- restore previous value for $DW$, increase $W$ accordingly and stop any further $W$ adjustments as the consumer has reached perfect sycnhornized state with the producer.
+\end{itemize}
+\end{enumerate}
+
 % Listing \ref{lst:fetch-algo} shows pseudo-code for the bootstrapping phase.
 
 % \begin{algorithm}
@@ -395,6 +410,14 @@ The bootstrapping phase starts with issuing an Interest with the enabled \textit
 % \label{lst:fetch-algo}
 % \caption{Bootstrap}
 % \end{algorithm}
+
+During playback, $W$ provides a simple mechanism to speed up or slow down Interest expression. Any increase in $W$ value makes the consumer issue more Interests (Figure \ref{fig:int-burst}), whereas any decrease in $W$ holds the consumer back from sending any new Interests (Figure \ref{fig:int-hold}). Larger values of $W$ make the consumer reach a synchronized state with the producer more quickly. However, a larger value means a larger number of outstanding Interests and larger $RTT^\prime$ because of longer generation delays $d_{gen}$ for each media sample. By adjusting the value of $W$ and observing inter-arrival delays $D_{arr}$, the consumer can find minimal $RTT^\prime$ value while still getting non-cached data, thus achieving the best synchronization state with the producer.
+
+The consumer continues to observe $RTT^\prime$ and $D_{arr}$ in the playback mode. Whenever $D_{arr}$ indicates that no fresh data is being received, the consumer increases \wConcept{} and starts the adjusting process over again to find minimal $RTT^\prime$ for the new conditions. Such approach helps the consumers to adjust in cases when data may suddenly start to arrive from different network hub which introduces new network $RTT$.
+
+For more complex scenarios of video streaming, the consumer controls expression of ``batches" of Interests rather than individual Interests, because video frames are composed of several segments. In this case, $W$ is adjusted on a per-frame basis, rather than per-segment. In all other respects, the same logic (as above) can be applied.
+
+The bootstrapping phase starts with issuing an Interest with the enabled \textit{RightMostChild} selector, in Delta namespace for audio and Key namespace for video. The reason this process differs for video streams is that the consumer is not interested in fetching Delta frames without having corresponding Key frames for decoding. Once an initial data segment of a sample with number $S_{seed}$ has been received, the consumer initializes $W$ with initial value $DW$ and asks for the next sample data $S_{seed}+1$ in the appropriate namespace. Upon receiving the first segments of sample $S_{seed}+1$, the consumer initiates the fetching process (described above) for all namespaces (Delta and Key, if available). This bootstrapping phase stops when the consumer finds the minimal value of $W$ which still allows receiving the most recent data and the consumer switches to the playback mode.
 
 
 \section{Implementation}
@@ -481,9 +504,9 @@ Moreover, the problem described above can not occur if the consumer knows that i
 \centering
 %\captionsetup[subfigure]{aboveskip=-1pt,belowskip=-2pt}
 \begin{scriptsize}
-\subfigure[$W=10$: short chasing, larger $RTT^\prime$]{\def\svgwidth{0.48\textwidth}\input{w10.pdf_tex}}
-\subfigure[$W=4$: longer chasing, smaller $RTT^\prime$]{\def\svgwidth{0.48\textwidth}\input{w4.pdf_tex}}
-\subfigure[$W=3$: consumer can't exhasut cache, $RTT^\prime = RTT$]{\def\svgwidth{0.48\textwidth}\input{w3.pdf_tex}}
+\subfigure[$W=10$: short chasing, larger $RTT^\prime$]{\label{fig:ws10}\def\svgwidth{0.48\textwidth}\input{w10.pdf_tex}}
+\subfigure[$W=4$: longer chasing, smaller $RTT^\prime$]{\label{fig:ws10}\def\svgwidth{0.48\textwidth}\input{w4.pdf_tex}}
+\subfigure[$W=3$: consumer can't exhasut cache, $RTT^\prime = RTT$]{\label{fig:ws10}\def\svgwidth{0.48\textwidth}\input{w3.pdf_tex}}
 \end{scriptsize}
 \caption{Larger $W$ decreases ``chasing" phase, but increases $RTT^\prime$ for the same network configuration ($RTT\approx100ms$)}
 \label{fig:ws}

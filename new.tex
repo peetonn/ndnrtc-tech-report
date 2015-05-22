@@ -17,6 +17,7 @@
 \usepackage{enumitem}
 %\usepackage{pstricks}
 
+
 %\usepackage{authblk}  %% supported in class
 % \usepackage{float}
 % \newfloat{algorithm}{t}{lop}
@@ -143,19 +144,17 @@ The producer's main tasks are to acquire video and audio data from media inputs,
 In the case of video streaming, the producer uses video encoding in order to reduce the sizes of the frames. There are two types of encoded frames: \textit{Key} and \textit{Delta}. Key frames contain most of the video information, and do not depend on any previous frames to be decoded. Delta frames are dependent on the previous frames (received after the last Key frame), and cannot be decoded without significant visual artifacts if any of the Key frames are missing.
 
 Encoded frames vary in size, but the average bitrate stays the same. For example, the average sizes of frames for 1000 kbps stream using VP8/VP9: Key frames are $\approx$ 30KB, and Delta frames are $\approx$ 3-7KB.
-Therefore, depending on the underlying Internet Protocol used (IP in the existing NDN testbed), the producer may need to segment encoded frames into smaller chunks and provide clear naming conventions.
+Therefore, depending on the underlying transport's performance for delivering objects of this size, the producer may need to segment encoded frames into smaller chunks and provide clear naming conventions. Based on our current observations of performance and the prevalence of UDP as a transport for he NDN testbed, \ndnrtcName{} currently packetizes media into segments that are less than the typical 1500 byte MTU. 
 
 %************************************************
 \subsection{Namespace}
 
-As there is no direct consumer-producer communication, it is the producer's job to provide as much supportive information as possible, and the consumer must be able to use this information. These data types should be reflected in the namespace:
-media data (segmented video frames and bundled audio samples), error correction data, and metadata. 
-
+The \ndnrtcName{} namespace defines names for media (segmented video frames and bundled audio samples), error correction data, and metadata, as shown in Figure~\ref{}.  As there is no direct consumer-producer communication, the namespace is designed to efficiently support the type of fetching operations performed by the consumer, as described below. 
 %Besides that, the namespace should also reflect data specialization hierarchy - from general concepts in the root to more specialized entities towards the leaves. 
 
 \subsubsection{Media} 
 
-The \ndnrtcName{} producer uses a \textit{media stream} concept for describing published media. A media stream represents a flow of raw media packets (video frames or audio samples) coming from an input device. Streams usually derive names from their input devices. It is quite natural for a producer to publish several media streams simultaneously, if there is more than one device from which to publish media (for instance, video from camera, audio from microphone, and another video stream for computer screenshots). As all raw data should be encoded, the next level in the name hierarchy represents different encoder instances called \textit{media threads}. Thus, media threads allow the producer to provide the same media stream in several copies (e.g., low, medium and high quality, so that the consumer can choose the media thread suitable for current network conditions).
+The \ndnrtcName{} producer describes published media for a given source as a collection of \textit{media streams}. A media stream represents a flow of media data, such as video frames or audio samples, coming from a source--currently, an input device on the producer. (For now, names for streams are derived from their corresponding device information.) A typical publisher will publish several media streams simultaneously--e.g., at least camera and microphone, but also a separate stream for screenshots.  The data from stream is encoded at one or more bitrates configured on the producer, so in the name hierarchy, each stream has children corresponding to different encoder instances called \textit{media threads}. Media threads allow the producer to, for example, provide the same media stream in several quality levels, such as low, medium and high quality, so that the consumer can choose the media thread suitable for its requirements and current network conditions.
 
 %\begin{figure}[t!]
 %\centering
@@ -164,11 +163,12 @@ The \ndnrtcName{} producer uses a \textit{media stream} concept for describing p
 %\label{fig:stream-hierarchy}
 %\end{figure}
 
-\ndnrtcName{} does not use any specific media container format for delivering media to consumers. Instead, encoded media packets are segmented if needed and published under distinctive hierarchical names. Video frames are separated into two domains per frame type, Delta and Key, and numbered sequentially and independently. Sequence numbers for both Delta and Key frames start from 0. The next level specializes data type, either media or parity. Parity data, if the producer opts to publish it, can be used by a consumer to recover frames that miss one or more segments. The topmost level of the namespace defines individual data segments. These segments are also numbered sequentially, and segment numbers conform to NDN naming conventions \cite{ndnnaming}.
+\ndnrtcName{} packetizes encoder output directly and adds some basic metadata to each packet. Encoded media segments published under the hierarchical names described above, with video frames further separated into two domains per frame type, \texttt{delta} and \texttt{key}, each numbered sequentially and independently.  The next level in the tree separates data by type, either media or parity. Parity data for forward error correction, if the producer opts to publish it, can be used by a consumer to recover frames that miss one or more segments. 
+%% What was motivation for separating FEC naming this way and not some other way? 
+The deepest level of the namespace defines individual data segments. These segments are numbered sequentially, and their names conform to NDN naming conventions \cite{ndnnaming}.
 
-In the case of audio streams, there are some differences. First, there are no Key frames; therefore all audio packets are published under the Delta namespace. Second, audio samples are significantly smaller than video frames and do not require to be segmented. In practice, it appears that multiple audio samples can be bundled into one data segment. Instead of segmenting audio packets, they are bundled together until the size of one data segment is reached, and published only after that.
-
-Consumers need to know the producer's streams structure in order to fetch data successfully. To save consumers from traversing the producer's namespace, which can be time-consuming and unreliable, the producer publishes meta information about current streams under the \textit{session info} component. Thus, consumers can retrieve up-to-date information about the producer's state.
+Audio streams, are handled differently, as their samples are smaller than the maximum payload size and there is no equivalent to the key/delta frame distinction in the audio codecs in use. All audio packets are published under the \texttt{delta} namespace. Multiple audio samples are bundled into one data packet, until the size of one data segment is reached, and published only after that.
+%% How is audio/video sync maintained?? 
 
 \begin{figure}[t!]
 \centering
@@ -179,18 +179,22 @@ Consumers need to know the producer's streams structure in order to fetch data s
 
 \subsubsection{Metadata} 
 
-Besides naming data objects, data names can be appended by some additional media-level meta information, which can be used by consumers regardless of which frame segment was received first. Four components are added at the end of every data segment name:
+In addition to data carried in names, \ndnrtcName{} uses both stream- and packet-level metadata. Consumers need to know the producer's specific namespace structure in order to fetch data successfully. To save consumers from traversing the producer's namespace, the producer publishes meta-information about current streams under the \texttt{session info} component. 
+%% How often? 
+Thus, consumers can retrieve up-to-date information about the producer's state.
+%% state and "up-to-date" are ambigiuous here - what do they mean
+Additionally, data names carry further metadata as part of each packet, which can be used by consumers regardless of which frame segment was received first. 
+Four components are added at the end of every data segment name:
+%% should really use texttt convention for names, I think
 \small\begin{equation}
-\textit{seg\_name}/\textbf{num\_seg}/\textbf{playback\#}/\textbf{paired\_seq\#}/\textbf{num\_parity} \nonumber
+\texttt{\textit{seg\_name}/\textbf{num\_seg}/\textbf{playback\#}/\textbf{paired\_seq\#}/\textbf{num\_parity} \nonumber}
 \end{equation}\normalsize
 \begin{itemize}[label={}]
-\item \textit{num\_seg} - total number of segments for this frame;
-\item \textit{playback\#} - absolute playback number for current frame; this is different from the \textit{frame\#} which is a sequential number for the frame in its domain (i.e. Key or Delta);
-\item \textit{paired\_seq\#} - sequential number of the corresponding frame from other domain (i.e., for Delta frames, it is sequential number of the corresponding Key frame which is required for decoding);
-\item \textit{num\_parity} - number of parity segments for particular frame.
+\item \texttt{num\_seg} - total number of segments for this frame;
+\item \texttt{playback\#} - absolute playback position for current frame; this is different from the \textit{frame\#} which is a sequence number for the frame in its domain (i.e. \texttt{key} or \texttt{delta});
+\item \texttt{paired\_seq\#} - sequence number of the corresponding frame from other domain (i.e., for delta frames, it is the sequence number of the corresponding key frame required for decoding);
+\item \texttt{num\_parity} - number of parity segments for the frame.
 \end{itemize}
-
-The pull-based nature of NDN and our experimental application's deliberate avoidance of explicit consumer-producer synchronization (allowing publisher-independent scaling) have shown the importance of providing sufficient meta information on the producer side. Such information (which could include Interests' nonce values, Interests' arrival timestamps and data generation delays), if added to the returned data segment, may help consumers evaluate relevant network performance, detect congestion, and assess whether incoming data is likely to be stale (delayed beyond the path delay). Furthermore, keeping historical data on the consumer side may help Interest pipelining in the future. For instance, providing the average number of segments per frame type helps consumers estimate the number of required initial Interests to fetch upcoming frames. This helps keep frame fetching cycles minimal.
 
 
 %************************************************
@@ -198,31 +202,46 @@ The pull-based nature of NDN and our experimental application's deliberate avoid
 % The producer generates signed data objects from input media streams and places them in the cache instantly. Incoming Interests retrieve data from the cache, if it is present, or forward further to the producer, if the requested data has yet to be produced. In such cases, the producer maintains a Pending Interests Table (PIT), which is checked every time a new data object is generated. If an Interest for a newly generated data object exists in the PIT, it gets answered, and the PIT entry is erased.
 
 \subsubsection{Media stream}
-%% TODO: What's the media payload?
-Packet payload consists of two types of data -- media stream data and metadata. Video stream data contains actual bytes received from the library's video encoder which represents the encoded frame. For the audio, \ndnrtcName{} uses RTP and RTCP packets, coming from the WebRTC audio processing pipeline, which are then fed into a similar pipeline on the consumer side for proper rendering and corrections (such as echo-cancellation, gain control, etc.).
+Each media packet payload consists of two types of data -- media stream data and metadata. Video stream data contains actual bytes received from the library's video encoder which represents the encoded frame. For the audio, \ndnrtcName{} captures and encapsulates RTP and RTCP packets coming from the WebRTC audio processing pipeline, in order to obtain echo-cancellation, gain control, and other features, which are then fed into a similar pipeline on the consumer side for proper rendering and corrections.\footnote{This is an artifact of the current implementation, and as features of these IP-based protocols are not used, would be eliminated in the future.}
+
 
 \begin{figure}[t!]
 \centering
-
-\subfigure[video frame segmentation]{\label{fig:segment}\includegraphics[width=0.5\textwidth]{segmentation}}
-\subfigure[audio samples bundling]{\label{fig:audio-bundling}\includegraphics[width=0.3\textwidth]{audio-bundling}}
-
+\subfigure[Video frame segmentation]{\label{fig:segment}\includegraphics[width=0.5\textwidth]{segmentation}}
+\subfigure[Audio sample bundling]{\label{fig:audio-bundling}\includegraphics[width=0.3\textwidth]{audio-bundling}}
 \caption{Segmentation and bundling}
-
 \end{figure}
 
 \subsubsection{Metadata}
 
-Besides actual stream data, data objects contain some amount of meta information which is prepended while frames are segmenting (see Figure \ref{fig:segment}). There are two header types: \textit{Frame header} and \textit{Segment header}. Frame header is prepended to segment \#0 of each individual video frame, and contains media-specific information (such as frame size), timestamp, current rate and Unix timestamp, which can be used for calculating actual delay between NTP-synchronized producer and consumers (see Figure \ref{fig:data-struct}). Segment header is prepended to every segment of a frame. It carries network-level information which can be used by consumers to estimate current network conditions and the origin of the data objects received:
+The receiver-driven architecture of \ndnrtcName{} and our experimental application's deliberate avoidance of explicit consumer-producer synchronization, to explore network scaling support, have shown the importance of providing sufficient meta information on the producer side. Some this is done in the namespace, as described above.  Other information is provided in the data objects themselves. 
+%%%%%%%% Need to explain why some metadata is in the name, and why some is in the payload!!! What type goes where? 
+
+Packet-level metadata is applied to video as a header prepended to each segment (see Figure \ref{fig:segment}). Each audio bundle (packet) is prepended by the same frame header (see Figure \ref{fig:audio-bundling}). There are two header types: \textit{Frame header} and \textit{Segment header}. Frame header is prepended to segment \#0 of each individual video frame, and contains media-specific information (such as frame size), timestamp, current rate and Unix timestamp\footnote{Producer timestamp is \textit{not} required but can be used for calculating actual delay between NTP-synchronized producers and consumers)} (see Figure \ref{fig:data-struct}).
+
+%%%% The following paragraph may be a little controversial
+%%%% You should clarify whether consumers that do not issue the 
+%%%% specific interest reported can really make use of it
+%%
+Additionally, as an aid to experimentation and for optimizing two-way conversations, the header also carries the producer's observations of Interest arrival that can be used by consumers to hint fetching and playback choices.  These make use of the Interest nonce value and thus may not be as useful in larger multi-party calls: 
 \begin{itemize} [label={}]
-
+\item \textit{Interest nonce}: Nonce of the Interest which \textit{first} requested this particular segment. There are three meaningful cases:  1) \textit{value belongs to the Interest issued previously} - consumer received non-cached data requested by Interest issued previously; 2) \textit{value is non-zero, but does not belong to any of the previously issued Interests} - consumer received data requested by some other consumer; data may be cached; 3) \textit{value is zero} - consumer received data which was cached on the producer side and never requested by anyone before.
 \item \textit{Interest arrival timestamp}: Timestamp of the Interest arrival. Monitoring this value and Interest expression timestamps over time may give consumers a clue about how long it takes for Interests to reach the producer. This value is only valid when the nonce value belongs to one of a given consumer's Interests.
-
 \item \textit{Generation delay}: Time interval in milliseconds between Interest arrival and segment publishing. A consumer can use this value in order to control the number of outstanding Interests. This value is only valid when the nonce value belongs to one of the consumer's Interests.
-
-\item \textit{Interest nonce}: Nonce of the Interest which requested this particular segment. There are three meaningful cases:  1) \textit{value belongs to the Interest issued previously} - consumer received non-cached data requested by Interest issued previously; 2) \textit{value is non-zero, but does not belong to any of the previously issued Interests} - consumer received data requested by some other consumer; data may be cached; 3) \textit{value is zero} - consumer received data which was cached on the producer side and never requested by anyone before.
-
 \end{itemize}
+
+
+%% The following paragraphs is relocated and was unclear
+
+% This one seems to duplicate the above- 
+%
+%Such information (which could include Interests' nonce values, Interests' arrival timestamps and data generation delays), if added to the returned data segment, may help consumers evaluate relevant network performance, detect congestion, and assess whether incoming data is likely to be stale (delayed beyond the path delay). 
+
+% This seems to either be future work, or on the consumer side.  It is
+% unclear whey it was above
+%
+%Furthermore, keeping historical data on the consumer side may help Interest pipelining in the future. For instance, providing the average number of segments per frame type helps consumers estimate the number of required initial Interests to fetch upcoming frames. This helps keep frame fetching cycles minimal.
+
 
 \begin{figure}[t!]
 \centering
@@ -232,24 +251,19 @@ Besides actual stream data, data objects contain some amount of meta information
 \label{fig:data-struct}
 \end{figure}
 
-Audio samples are not prepended by any segment header, however the whole audio bundle is prepended by the same frame header (see Figure \ref{fig:audio-bundling}).
-
 %************************************************
 \subsection{Consumer}
 
-The \ndnrtcName{} architecture is receiver-driven. The consumer aims to achieve the following goals:
-\begin{itemize}
-\item fetch the latest data available in the network; 
-\item choose the most appropriate media stream bandwidth from those  provided by the producer (by monitoring network conditions);
-\item fetch (and, if necessary, reassemble) media in the correct order for playback;
-\item mitigate, as far as possible, the impact of network latency and packet drops on the viewer's quality of experience.
-\end{itemize}
+The \ndnrtcName{} architecture is receiver-driven. The consumer aims to achieve 2) choose the most appropriate media stream bandwidth from those  provided by the producer (by monitoring network conditions); 3) fetch (and, if necessary, reassemble) media in the correct order for playback; 4) mitigate, as far as possible, the impact of network latency and packet drops on the viewer's quality of experience.  As described above, ne of our research goals is to explore performance of the consumer in meeting these requirements without requiring direct communication with the producer.
 
 %************************************************
 \subsubsection{Interest pipelining and Data buffering}
 
-Media streams are packetized by the publisher, currently into segments that are less than the typical 1500 byte MTU of the current Internet. The consumer implements Interest pipelining and data buffering (see Figure \ref{fig:consumer}) to fetch and reassemble video and audio data. An asynchronous Interest pipeline issues Interests for individual segments. Packet re-ordering and drops and latency fluctuations absorption are handled by the frame buffer, which re-arranges received frames in the playback order.
-%%Sentence 3 of the previous paragraph could mean a few things as currently written.
+The consumer implements Interest pipelining and data buffering (see Figure \ref{fig:consumer}) to fetch and reassemble video and audio data while allowing for out-of-order arrival and interest reexpression. An asynchronous Interest pipeline issues Interests for individual segments. A frame buffer handles re-ordering of packets, and informs the pipeline of its status to prompt interest reexpression.
+%%
+%% Peter, you really should talk about how the buffer and pipeliner 
+%% interact somewhere as this is really interest.
+%%
 
 
 %************************************************
@@ -290,9 +304,14 @@ For example, the consumer may use it during the fetching process, as will be dis
 
 \subsubsection{Interest expression control}
 
+%%  Probably want to cover all cases of interest rexpression here
+%% - Prompted by timeouts in buffer
+%% - To do the chasing
+
+
 A key challenge in a consumer-driven model for videoconferencing in a caching network is to ensure the consumer gets the latest data, without resorting to direct producer-consumer communication that would limit scaling. To get fresh data, the consumer cannot rely on using such flags as \textit{AnswerOriginKind} and \textit{RightMostChild}. The high rate of streaming data relative to network latency means there is no guarantee that the data satisfying those flags received by a consumer will be the most recent one. Instead, it is necessary to use other indicators to ensure that the consumer is requesting the most up-to-date stream data possible given its network connectivity. 
 
-Our initial solution is to leverage the known segment publishing rate, which is available in stream-level metadata, and note that, under normal operation, old, cached samples are likely to be retrieved more quickly than new data.~\footnote{If the consumer is the \emph{only} consumer of the stream, its Interests will go directly to the publisher, which also yields the correct behavior. A more complex challenge, for further study, is when segments are inconsistently cached in different ways along the path(s) that Interests take.} We define the interarrival delay ($D_{arr}$) as the time between receipt of successive samples at a given consumer. Delays in the most recent samples follow the publishers' generation pattern, but cached data will follow the Interest expression temporal pattern. Therefore, by monitoring inter-arrival delays of consecutive media samples and comparing them to the timing of Interest expression, consumers can estimate data freshness (see Figure \ref{fig:inter-arrival}).
+Our initial solution is to leverage the known segment publishing rate, which is available in stream-level metadata, and note that, under normal operation, old, cached samples are likely to be retrieved more quickly than new data.~\footnote{If the consumer is the \emph{only} consumer of the stream, its Interests will go directly to the publisher, which also yields the correct behavior. A more complex challenge, for further study, is when segments are inconsistently cached in different ways along the path(s) that Interests take.} We define the interarrival delay ($D_{arr}$) as the time between receipt of successive samples by a given consumer. Delays in the most recent samples follow the publishers' generation pattern, but cached data will follow the Interest expression temporal pattern. Therefore, by monitoring inter-arrival delays of consecutive media samples and comparing them to the timing of Interest expression, consumers can estimate data freshness (see Figure \ref{fig:inter-arrival}).
 
 %%The following sentences really don't make much sense: To get fresh data, which can be cached but should not be the newest available for the consumer's path, the consumer cannot rely only on using such flags as \textit{AnswerOriginKind} and \textit{RightMostChild}. The high frequency nature of streaming data makes no guarantees that the data satisfying those flags received by a consumer will be the most recent one.
 
@@ -307,6 +326,8 @@ Our initial solution is to leverage the known segment publishing rate, which is 
 \label{fig:inter-arrival}
 \end{figure}
 
+%% What is bootstrapping? 
+%%
 During bootstrapping, the consumer ``chases" the producer and aims to exhaust network cache of historical (non-real time) segments. By increasing the number of outstanding Interests, the consumer ``pulls cached data" out of the network, unless the freshest data begin to arrive. In order to control Interest expression, a concept of $W$ (roughly an ``Interest window") is introduced (see Figure \ref{fig:w-concept}). It expresses Interests only when $W > 0$. At every moment, $W$ indicates how many outstanding Interests can be sent. Before the bootstrapping phase, the consumer initializes $W$ with a value which reflects the consumer's estimate of how many Interests are needed in order to exhaust network cache and reach the most recent data. 
 
 \begin{figure}[t!]
@@ -321,7 +342,7 @@ During bootstrapping, the consumer ``chases" the producer and aims to exhaust ne
 \end{figure}
 
 
-$W$ provides a simple mechanism to speed up or slow down Interests expression. Any increase in $W$ value makes the consumer issue more Interests (Figure \ref{fig:int-burst}), whereas any decrease in $W$ holds the consumer back from sending any new Interests (Figure \ref{fig:int-hold}). Larger values of $W$ make the consumer reach a synchronized state with the producer more quickly. However, a larger value means a larger number of outstanding Interests and larger $RTT^\prime$ because of longer generation delays $d_{gen}$ for each media sample. By adjusting the value of $W$ and observing inter-arrival delays $D_{arr}$, the consumer can find minimal $RTT^\prime$ value while still getting non-cached data, thus achieving the best synchronization state with the producer.
+During playback, $W$ provides a simple mechanism to speed up or slow down Interest expression. Any increase in $W$ value makes the consumer issues more Interests (Figure \ref{fig:int-burst}), whereas any decrease in $W$ holds the consumer back from sending any new Interests (Figure \ref{fig:int-hold}). Larger values of $W$ make the consumer reach a synchronized state with the producer more quickly. However, a larger value means a larger number of outstanding Interests and larger $RTT^\prime$ because of longer generation delays $d_{gen}$ for each media sample. By adjusting the value of $W$ and observing inter-arrival delays $D_{arr}$, the consumer can find minimal $RTT^\prime$ value while still getting non-cached data, thus achieving the best synchronization state with the producer.
 %% Interests' expression, Interests expression, Interest expression, etc.? 
 
 For more complex scenarios of video streaming, the consumer controls expression of ``batches" of Interests rather than individual Interests, because video frames are composed of several segments. In this case, $W$ is adjusted on a per-frame basis, rather than per-segment. In all other respects, the same logic (as above) can be applied.
@@ -376,29 +397,46 @@ The bootstrapping phase starts with issuing an Interest with the enabled \textit
 % \end{algorithm}
 
 
-%\subsubsection{Application-level PIT}
-\textit{Application-level PIT.} In most cases, consumers aim to express Interests for the data not yet produced, to be immediately satisfied when data is produced. The current NDN-CPP library provides a producer-side Memory Content Cache implementation into which data is published. However, this is only useful when data has been published and put in the cache before an Interest for this data has arrived. For the missing data, the Interest is forwarded to the producer application which stores it in the internal Pending Interests Table (PIT) unless requested data is ready. This functionality seems quite common for low-latency applications, and has now been incorporated into the NDN-CPP library implementation.
-
 \section{Implementation}
 \label{sec:imp}
 \ndnrtcName{} is implemented as a library written in C++, which is available at \url{https://github.com/remap/ndnrtc}. 
 It provides a publisher interface for publishing an arbitrary number of media streams (audio or video) and a consumer interface with a callback for rendering decoded video frames in a host application. The OS X platform is currently supported; Linux build instructions will be added soon. 
 The library distribution also comes with a simple console application which demonstrates the use of the \ndnrtcName{} library.
 
-\ndnrtcName{} exploits some functionality from several third-party libraries with which it is linked. NDN-CPP \cite{ndnccl} is used for NDN connectivity. The WebRTC framework \cite{webrtc} is used in two ways: 1) incorporation of the existing video codec; 2) full incorporation of the existing WebRTC audio pipeline, including echo cancellation. OpenFec \cite{openfec} is used for forward error correction support.
+\ndnrtcName{} exploits some functionality from several third-party libraries with which it is linked. NDN-CPP \cite{ndnccl} is used for NDN connectivity. The WebRTC framework \cite{webrtc} is used in two ways: 1) incorporation of the existing video codec; 2) full incorporation of the existing WebRTC audio pipeline, including echo cancellation. OpenFEC \cite{openfec} is used for forward error correction support. 
 
-Apart from the library, the first desktop NDN videconferencing application \ndnconName{} \cite{ndncon} was implemented on top of \ndnrtcName{}. It provides a convenient UI for publishing and fetching media streams, text chat, and organizing multi-party audio/video conferences.
+Some features were incorporated into the library based on our experience in this application.
+% Should discuss memory content cache?
+ In most cases, consumers aim to express Interests for the data not yet produced, to be immediately satisfied when data is produced. The current NDN-CPP library provides a producer-side Memory Content Cache implementation into which data is published. However, this is only useful when data has been published and put in the cache before an Interest for this data has arrived. For the missing data, the Interest is forwarded to the producer application which stores it in the internal Pending Interests Table (PIT) unless requested data is ready. This functionality seems quite common for low-latency applications, and has now been incorporated into the NDN-CPP library implementation.
 
-\section{Evaluation}
+In addition to the library, the first desktop NDN videconferencing application \ndnconName{} \cite{ndncon} was implemented on top of \ndnrtcName{}. It provides a convenient UI for publishing and fetching media streams, text chat, and organizing multi-party audio/video conferences. It was used, along with a command-line interface for the evaluation below.
+
+\section{Evaluation \& Iterative refinement}
 \label{sec:eval} 
-During the course of this project, there were several architecture design iterations that introduced successive improvements in the overall quality of the algorithms. (These are described further in this section.) Each iteration tackled problems that were revealed during tests (mostly in practice rather than simulated).
+Over the course of \ndnrtcName{}'s initial development, there were several application design iterations that each introduced improvements in the overall quality of experience for the end user, as well as application efficiency in terms of bandwidth and computation. Each iteration tackled problems that were revealed during tests (mostly in practice rather than simulated). These motivated namespace, application packet format, and other revisions, which are reflected in the design above and described further in this section. 
 
 \subsection{Video streaming performance}
-Video streaming performance in previous versions of \ndnrtcName{} suffered from video ``hiccups", even when being tested on trivial one-hop topologies. The cause of this problem turned out to be an inefficient frame fetching process.
+A series of tests were conducted in order to assess efficiency and quality of service compared to Skype video calls. Each test was comprised of six runs of 2-person, 5-minute conference talks using \ndnconName{} (the graphical conferencing application built on top of \ndnrtcName{}):
+\begin{itemize}
+\item 3 runs of audio+video with low, medium and high video bandwidths settings (0.5, 0.7 and 1.5 Mbit/s accordingly);
+\item 1 run of audio-only conference;
+\item 1 run of Skype audio+video conference;
+\item 1 run of Skype audio-only conference.
+\end{itemize}
 
-As described in previous sections, Key frames are usually much heavier than Delta frames and require more data segments for delivery. In early library versions, this differentiation was not reflected in the producer's namespace, which made consumer to pipeline equal number of initial interests ($M$ on Figure \ref{fig:pull}) for both frame types. This resulted in larger assembling times ($d_{asm}$) for the Key frames and additional round trips of missing Interests. Increased assembling time quite often caused skipping incomplete Key frames, as they were not assembled by the time they should have been played out. Eventually, all the consequent Delta frames were skipped as well, which degraded the overall video streaming experience by introducing the video ``hiccup" effect.
+Tests were conducted across the existing NDN testbed, between the UCLA REMAP hub and six other hubs. Tests covered both one-hop and multi-hop (with several intermediate hubs) topologies.
 
-Having a separate namespace for Key frames allowed the consumer to maintain separate Interest pipelines per frame type and collect historical data on the average number of Interests required to retrieve one frame of each type in one round trip.
+Figure \ref{fig:tests-skype} shows overall bitrate usage results. Whereas Skype has fully utilized link capacity between peers, and delivered higher bitrate videos, NdnCon did not adjust to the current network conditions which make adaptive rate control features highly desirable.
+
+Actual average bitrates turned out to be slightly higher than pre-configured video streams -- 0.7, 0.9 and 1.8 Mbit/s for low, medium and high bandwidths respectively-- which can be explained by NDN packet overhead which is approximately 280-330 bytes and accounts for $\approx$30\% of the segment size (1000 bytes). Having such large overhead makes transferring audio samples in separate segments highly inefficient. Thus, further improvement to the algorithms was made by bundling consecutive audio samples unless they filled the size of a segment. With 90 Kbit/s audio, approximately five audio samples can be added to a 1000-bytes data segment. Eventually, this improvement effectively reduced audio bandwidth(and the number of Interests on the consumer side), making it comparable to Skype audio bandwidths.
+
+%The overall user experience for these 2-person conferences was subjectively assessed as being higher than average - 3 points on a scale from 0 to 5 (Skype calls were taken as 5-point user experiences).
+%%% I would not include this. 
+
+The results of such testing influenced iterative updates to the design, two of which are described below. 
+
+\paragraph{Separation of key and delta frame namespaces}. Video streaming performance in early versions of \ndnrtcName{} suffered from video ``hiccups", even when being tested on trivial one-hop topologies. The cause of this problem turned out to be an inefficient frame fetching process.
+As described in previous sections, key frames are much larger than delta frames and require more data segments for delivery. In early \ndnrtcName{} versions, this differentiation was not reflected in the producer's namespace, which made consumer to pipeline equal number of initial interests ($M$ on Figure \ref{fig:pull}) for both frame types. This resulted in larger assembling times ($d_{asm}$) for the key frames and additional round trips of missing Interests. Increased assembling time quite often caused skipping incomplete key frames, as they were not assembled by the time they should have been played out. Eventually, all the subsequent delta frames were skipped as well, which degraded the overall video streaming experience by introducing the video ``hiccup" effect. Having a separate namespace for key frames enables consumers to maintain separate Interest pipelines per frame type and collect historical data on the average number of Interests required to retrieve one frame of each type in one round trip.
 
 \subsection{Quality of experience}
 \begin{figure}[t!]
@@ -411,22 +449,6 @@ Having a separate namespace for Key frames allowed the consumer to maintain sepa
 \label{fig:tests-skype}
 \end{figure}
 
-A series of tests were conducted in order to assess efficiency and quality of service compared to Skype calls. Each test was comprised of six runs of 2-person, 5-minute conference talks using NdnCon (GUI conferencing application built on top of \ndnrtcName{}):
-\begin{itemize}
-\item 3 runs of audio+video with low, medium and high video bandwidths settings (0.5, 0.7 and 1.5 Mbit/s accordingly);
-\item 1 run of audio-only conference;
-\item 1 run of Skype audio+video conference;
-\item 1 run of Skype audio-only conference.
-\end{itemize}
-
-Tests were conducted across the existing NDN testbed, between the REMAP hub (aleph.ndn.ucla.edu) and six other hubs. Tests covered both one-hop and multi-hop (with several intermediate hubs) topologies.
-
-Figure \ref{fig:tests-skype} shows overall bitrate usage results. Whereas Skype has fully utilized link capacity between peers, and delivered higher bitrate videos, NdnCon did not adjust to the current network conditions which make adaptive rate control features highly desirable.
-
-Actual average bitrates turned out to be slightly higher than pre-configured video streams -- 0.7, 0.9 and 1.8 Mbit/s for low, medium and high bandwidths respectively-- which can be explained by NDN packet overhead which is approximately 280-330 bytes and accounts for $\approx$30\% of the segment size (1000 bytes). Having such large overhead makes transferring audio samples in separate segments highly inefficient. Thus, further improvement to the algorithms was made by bundling consecutive audio samples unless they filled the size of a segment. With 90 Kbit/s audio, approximately five audio samples can be added to a 1000-bytes data segment. Eventually, this improvement effectively reduced audio bandwidth(and the number of Interests on the consumer side), making it comparable to Skype audio bandwidths.
-
-
-The overall user experience for these 2-person conferences was subjectively assessed as being higher than average - 3 points on a scale from 0 to 5 (Skype calls were taken as 5-point user experiences).
 
 \subsection{Consumer-Producer synchronization}
 
@@ -447,12 +469,11 @@ The overall user experience for these 2-person conferences was subjectively asse
 \label{fig:dgen}
 \end{figure}
 
-In previous library versions, the consumer ``chased" the producer's time-series data by exhausting cached data and issuing a large number of outstanding Interests. However, there was no mechanism for the consumer to figure out how early those Interests are issued and whether Interest expression should be postponed in order to eliminate time outs. For two similar test runs (one-hop topology), the number of timed out Interests and re-transmissions varied greatly (either $\approx$1\% or $\approx$50\%). One was due to an incorrect consumer's synchronization with the producer; Interests were issued too early, so they timed out before any data had been produced. This problem can be solved by increasing Interests' lifetime. However, for previous library versions, the mechanism for buffering (see Figure \ref{fig:old-buf}) dictated the Interests' lifetime. In fact, in order to maintain the re-transmission checkpoint, all Interests entering the buffer had a lifetime equal to half of the current buffer size. This approach resulted in unavoidable Interest time outs, in the cases when the consumer issued Interests far too early (before the actual data was produced).
-
+\paragraph{Bootstrap behavior.} In previous library versions, the consumer ``chased" the producer's time-series data by exhausting cached data and issuing a large number of outstanding Interests. However, there was no mechanism for the consumer to figure out how early those Interests are issued and whether Interest expression should be postponed in order to eliminate time outs. For two similar test runs (one-hop topology), the number of timed out Interests and re-transmissions varied greatly (either $\approx$1\% or $\approx$50\%). One was due to an incorrect consumer's synchronization with the producer; Interests were issued too early, so they timed out before any data had been produced. This problem can be solved by increasing Interests' lifetime. However, for previous library versions, the mechanism for buffering (see Figure \ref{fig:old-buf}) dictated the Interests' lifetime. In fact, in order to maintain the re-transmission checkpoint, all Interests entering the buffer had a lifetime equal to half of the current buffer size. This approach resulted in unavoidable Interest time outs, in the cases when the consumer issued Interests far too early (before the actual data was produced).
 
 For the current version of the library, the re-transmission checkpoint is placed at $RTT$ milliseconds from the end of the buffer ($J=RTT$ on the Figure \ref{fig:old-buf}). This, together with an updated NFD re-transmission strategy \cite{nfd-rtx-release}, allows for larger Interests' lifetimes.
 
-Moreover, the problem described above could not occur if the consumer knows that it is issuing Interests too early. The chasing algorithm in older library versions was exhausting the network cache too aggressively; Interests were issued constantly until they filled up the buffer. After that, frames were retrieved at the producer's rate, and more Interests were issued unless the consumer started to receive the most recent data. This approach suffers from a lack of knowledge about issued Interests and data generation delay, and $RTT^\prime$ are not taken into account.
+Moreover, the problem described above can not occur if the consumer knows that it is issuing Interests too early. The chasing algorithm in older library versions was exhausting the network cache too aggressively; Interests were issued constantly until they filled up the buffer. After that, frames were retrieved at the producer's rate, and more Interests were issued unless the consumer started to receive the most recent data. This approach suffers from a lack of knowledge about issued Interests and data generation delay, and $RTT^\prime$ are not taken into account.
 
 %%In the second sentence above, I changed it to until, but it was initially unless.
 
@@ -483,7 +504,7 @@ With the introduction of the $W$ concept, the consumer has full control of the I
 %How was the end-user quality of experience by the time the paper was written
 %What kinds of things did you add to support it. 
 
-\subsection{Community use}
+\subsection{Multi-party use}
 
 \begin{figure}[t!]
 \centering

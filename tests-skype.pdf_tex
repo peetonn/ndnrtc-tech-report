@@ -49,22 +49,22 @@
   \global\let\svgscale\undefined%
   \makeatother%
   \begin{picture}(1,0.44722222)%
-    \put(0,0){\includegraphics[width=\unitlength,page=1]{tests-skype.pdf}}%
-    \put(0.15625,0.38152778){\color[rgb]{0,0,0}\makebox(0,0)[lb]{\smash{\textbf{Overall bitrate results}}}}%
-    \put(0,0){\includegraphics[width=\unitlength,page=2]{tests-skype.pdf}}%
-    \put(0.20570437,0.04902779){\color[rgb]{0.13333333,0.13333333,0.13333333}\rotatebox{15}{\makebox(0,0)[b]{\smash{Arizona}}}}%
-    \put(0.30391865,0.04902779){\color[rgb]{0.13333333,0.13333333,0.13333333}\rotatebox{15}{\makebox(0,0)[b]{\smash{Caida}}}}%
-    \put(0.40213292,0.04902779){\color[rgb]{0.13333333,0.13333333,0.13333333}\rotatebox{15}{\makebox(0,0)[b]{\smash{Colostate}}}}%
-    \put(0.50034722,0.04902779){\color[rgb]{0.13333333,0.13333333,0.13333333}\rotatebox{15}{\makebox(0,0)[b]{\smash{UCLA-1}}}}%
-    \put(0.59856152,0.04902779){\color[rgb]{0.13333333,0.13333333,0.13333333}\rotatebox{15}{\makebox(0,0)[b]{\smash{UCLA-2}}}}%
-    \put(0.69677578,0.04902779){\color[rgb]{0.13333333,0.13333333,0.13333333}\rotatebox{15}{\makebox(0,0)[b]{\smash{WUSTL}}}}%
-    \put(0.79499012,0.04902779){\color[rgb]{0.13333333,0.13333333,0.13333333}\rotatebox{15}{\makebox(0,0)[b]{\smash{Average}}}}%
-    \put(0.14513889,0.08187502){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[rb]{\smash{0}}}%
-    \put(0.14513889,0.15079861){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[rb]{\smash{1.5}}}%
-    \put(0.14513889,0.21972222){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[rb]{\smash{3}}}%
-    \put(0.14513889,0.28864583){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[rb]{\smash{4.5}}}%
-    \put(0.14513889,0.35756944){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[rb]{\smash{6}}}%
-    \put(0.06881944,0.22361111){\color[rgb]{0.13333333,0.13333333,0.13333333}\rotatebox{90}{\makebox(0,0)[b]{\smash{\textit{Bitrate (Mbit/s)}}}}}%
-    \put(0,0){\includegraphics[width=\unitlength,page=3]{tests-skype.pdf}}%
+    \put(-0.05,0){\includegraphics[width=\unitlength,page=1]{tests-skype.pdf}}%
+    \put(0.10625,0.38152778){\color[rgb]{0,0,0}\makebox(0,0)[lb]{\smash{\textbf{Overall bitrate results}}}}%
+    \put(-0.05,0){\includegraphics[width=\unitlength,page=2]{tests-skype.pdf}}%
+    \put(0.15570437,0.04902779){\color[rgb]{0.13333333,0.13333333,0.13333333}\rotatebox{15}{\makebox(0,0)[b]{\smash{Arizona}}}}%
+    \put(0.25391865,0.04902779){\color[rgb]{0.13333333,0.13333333,0.13333333}\rotatebox{15}{\makebox(0,0)[b]{\smash{Caida}}}}%
+    \put(0.35213292,0.04902779){\color[rgb]{0.13333333,0.13333333,0.13333333}\rotatebox{15}{\makebox(0,0)[b]{\smash{Colostate}}}}%
+    \put(0.45034722,0.04902779){\color[rgb]{0.13333333,0.13333333,0.13333333}\rotatebox{15}{\makebox(0,0)[b]{\smash{UCLA-1}}}}%
+    \put(0.54856152,0.04902779){\color[rgb]{0.13333333,0.13333333,0.13333333}\rotatebox{15}{\makebox(0,0)[b]{\smash{UCLA-2}}}}%
+    \put(0.64677578,0.04902779){\color[rgb]{0.13333333,0.13333333,0.13333333}\rotatebox{15}{\makebox(0,0)[b]{\smash{WUSTL}}}}%
+    \put(0.74499012,0.04902779){\color[rgb]{0.13333333,0.13333333,0.13333333}\rotatebox{15}{\makebox(0,0)[b]{\smash{Average}}}}%
+    \put(0.10513889,0.08187502){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[rb]{\smash{0}}}%
+    \put(0.10513889,0.15079861){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[rb]{\smash{1.5}}}%
+    \put(0.10513889,0.21972222){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[rb]{\smash{3}}}%
+    \put(0.10513889,0.28864583){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[rb]{\smash{4.5}}}%
+    \put(0.10513889,0.35756944){\color[rgb]{0.26666667,0.26666667,0.26666667}\makebox(0,0)[rb]{\smash{6}}}%
+    \put(0.01881944,0.22361111){\color[rgb]{0.13333333,0.13333333,0.13333333}\rotatebox{90}{\makebox(0,0)[b]{\smash{\textit{Bitrate (Mbit/s)}}}}}%
+    \put(-0.65,-0.25){\includegraphics[width=1.7\unitlength,page=3]{tests-skype.pdf}}%
   \end{picture}%
 \endgroup%

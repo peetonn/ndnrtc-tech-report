@@ -1,6 +1,6 @@
 % Template: http://www.acm.org/sigs/publications/proceedings-templates#aL2 
 % 
-\documentclass{icn/sig-alternate-2012} % {proc}
+\documentclass{icn/sig-alternate-2013} % {proc}
 
 \usepackage{amsmath}    % need for subequations
 \usepackage{graphicx}   % need for figures
@@ -101,6 +101,8 @@ Based on this high-level concept, specific design goals were developed:
  
 \end{itemize} 
 
+%% addressing review 60B-1 (what's the goal? why NDN? etc.)
+Due to the fact that \ndnrtcName{} is first of its kind ``RTC-over-NDN" implementation attempt, it relies on a number of theoretical assumptions about the network, cache and low-latency data delivery. These assumptions are presented throughout the paper and reflect authors' understanding of data delivery in ICN. Nevertheless, initial testing results lay out the ground for research works in such ICN areas as congestion control, cache exhaustion, real-time data distribution, etc. We hope, that \ndnrtcName{} will play essential role in these researches as an exploratory tool.
 
 %************************************************
 \section{Background and prior work}
@@ -108,12 +110,15 @@ Based on this high-level concept, specific design goals were developed:
 
 Most video streaming work on ICN has focused on streaming playout with buffers larger than what can be used for videoconferencing.  For example, NDNVideo was successfully tested and deployed over NDN \cite{ndnvideo}, scaling to approximately one thousand consumers from a single, straightforward publisher over plain-vanilla NDN.~\cite{CrowleyNEAPresentation} The project focused on developing random-access pre-recorded and live video for location-based and mixed reality applications. Audio and video content, sliced into data chunks, was published into an NDN repository for online and offline access. The data chunks were named sequentially according to NDN naming conventions \cite{ndnnaming}. Additionally, the application namespace provided a time-based index which mapped individual data chunks to the media stream timeline and allowed the consumer to seek easily inside the stream. Even though the project worked well for live and pre-recorded media streaming, it did not meet requirements for low-latency communication, and its architecture was not immediately extensible for use as a conferencing solution.
 
-This work has been extended by others in \cite{ndnlive-tube}, which describes the details of two applications, NDNlive and NDNtube, that are designed to work with the latest NFD (NDN Forwarder Daemon) and use repo-ng \cite{repo-ng} for offline media storage. These applications employ a new API for application developers, the Consumer/Producer API \cite{cons-prod-api}, which works with higher-level ``Application Data Units" rather than Interests/Data packets. %The project, however, does not address real-time audio/video conferencing.
+This work has been extended by others in \cite{ndnlive-tube}, which describes the details of two applications, NDNlive and NDNtube, that are designed to work with the latest NFD (NDN Forwarder Daemon) and use repo-ng \cite{repo-ng} for offline media storage. These applications employ a new API for application developers, the Consumer/Producer API \cite{cons-prod-api}, which works with higher-level ``Application Data Units" rather than Interests/Data packets. 
+% adressing review 60A-3 (why complete rewrite?)
+At the moment of publication of current work NDNlive was still under development, however the whole project does not address real-time audio/video conferencing. \ndnrtcName{} on the other hand, was developed from the ground up with low-latency restriction in mind which influenced every aspect of design as will be discussed further.
 
 %And then, there is \cite{ndn-dash}. ???
 Other streaming video work includes \cite{ccn-dash} and \cite{ndn-dash}, which explore the advantages of using ICN networks for MPEG Dynamic Adaptive Streaming over HTTP. Although not directly related to low-latency streaming, these works also leverage ICN networks' caching ability for serving chunks of video files efficiently to multiple consumers.
 
 The Voice-over-CCN project \cite{voccn} was an early exploration of real-time communication over ICN, providing a similar level of quality compared to VoIP solutions with much greater scalability potential and simpler, more flexible architecture. Early in the NDN project, an audio conferencing application was developed in \cite{act-tool}. It leveraged use of Mumble VoIP software and successfully used NDN as a transport.  Initial effort for conference and user discovery was made in this work as well, which was continued in ChronoChat (mentioned above).  However, echo cancellation did not work well, which made it difficult to use in real world scenarios. Therefore, we elected to build \ndnrtcName{} on top of the WebRTC library, despite the additional, significant implementation complexity, in order to use its audio-processing capabilities and video codecs, and potentially give an opportunity for easier integration with supported web browsers.  No significant modifications are needed to WebRTC as used in \ndnrtcName{}, which means that so far we have been able to incorporate new versions of that library as needed. 
+
 %%which made it difficult to use in real world scenarios. what is "it"?
 % cite any others? 
 % Need to also cite the buffer fill paper, etc. 
@@ -296,6 +301,9 @@ Upon receiving the first data segment, the consumer knows from the metadata the 
 Of course, additional round trips for requesting missing data segments increase overall frame assembly time and the possibility that the frame will be incomplete by the time it should be played back. This problem can be mitigated if the consumer is able to make more accurate estimates of the number of initial Interests. The latest versions of the library uses different namespaces for bitrates for key frames and delta frames, making it straightforward for the consumer to keep Interests outstanding for the next frame in each and to estimate the number of Interests needed per frame, as the average number of segments varies greatly for the two frame types. 
 Additionally, the consumer tracks the average number of segments per frame type, adapting its estimates over time. A similar process is used for fetching audio, though for now, audio bundles are represented by just one segment.
 
+%% adressing review 60A-1 (why not to fetch the whole frame?)
+The presence of valuable interest-level metadata in each data chunk requires consumer to operate on segment level and makes it complicated to abstract fragmentation to a lower layer (i.e. Consumer-Producer API \cite{cons-prod-api}).
+
 \subsubsection{Buffering}
 
 % Buffer:
@@ -369,10 +377,13 @@ The consumer makes several iterative attempts to adjust $\lambda$ during bootstr
 \begin{enumerate}
 \item The consumer initializes \wConcept{} with $\lambda_d$, and initiates Interests expression.
 \item If the consumer did not receive freshest data during allocated time\footnote{In the currently implementation, 1000ms.}, increase \wConcept{}: $\lambda=\lambda+0.5\lambda_d; \lambda_d = \lambda_d+0.5\lambda_d$.
-\item \label{decrease-w} Whenever consumer receives freshest data (cache exhausted), decrease \wConcept{}: $\lambda=\lambda-0.5\lambda_d; \lambda_d = \lambda_-0.5\lambda_d$ and wait for either of the two possible outcomes:
+\item \label{decrease-w} Whenever consumer receives freshest data (cache exhausted), decrease \wConcept{}: $\lambda=\lambda-0.5\lambda_d; \lambda_d = \lambda_d-0.5\lambda_d$ and wait for either of the two possible outcomes:
 a) $RTT^\prime$ decreases and the consumer still receives the freshest data -- go to step \ref{decrease-w};
 b) the consumer starts to get cached data ($d_{arr}$ fluctuates greatly) -- restore previous value for $\lambda_d$, increase $\lambda$ accordingly and stop any further adjustments as the consumer has achieved sufficient synchronization with the producer.
 \end{enumerate}
+
+%% addressing review 60D-6
+One should note that $\lambda$ is an actual counter of how many Interests can be issued more and $\lambda_d$ represents total number of outstanding Interests, therefore $\lambda_d-\lambda$ shows how many outstanding Interests consumer has issued at any given point in time. The way $\lambda$ and $\lambda_d$ are adjusted was determined empirically and may be a good topic for further research.
 
 Note that bootstrapping begins with issuing an Interest with the enabled \textit{RightMostChild} selector, in \texttt{delta} namespace for audio and \texttt{key} namespace for video. The reason this process differs for video streams is that the consumer is not interested in fetching delta frames without having corresponding key frames for decoding. Once an initial data segment of a sample with number $S_{seed}$ has been received, the consumer initializes $\lambda$ with initial value $\lambda_d$ and asks for the next sample data $S_{seed}+1$ in the appropriate namespace. Upon receiving the first segments of sample $S_{seed}+1$, the consumer initiates the fetching process (described above) for all namespaces (\texttt{delta} and \texttt{key}, if available). The bootstrapping phase stops when the consumer finds the minimal value of $\lambda$ which still allows receiving the most recent data and the consumer switches to the playback mode.
 
@@ -433,8 +444,11 @@ The consumer continues to observe $RTT^\prime$ and $d_{arr}$ in the playback mod
 \section{Implementation}
 \label{sec:imp}
 \ndnrtcName{} is implemented as a library written in C++, which is available at \url{https://github.com/remap/ndnrtc}. 
-It provides a publisher API for publishing an arbitrary number of media streams (audio or video) and a consumer API with a callback for rendering decoded video frames in a host application. The OS X platform is currently supported; Linux build instructions will be added soon. 
-The library distribution also comes with a simple console application which demonstrates the use of the \ndnrtcName{} library.
+It provides a publisher API for publishing an arbitrary number of media streams (audio or video) and a consumer API with a callback for rendering decoded video frames in a host application.
+%% addressing review 60C-3
+\ndnrtcName{} does not provide conference call setup functionality. This task was intentionally left out to be solved be a host app.
+
+The OS X platform is currently supported; Linux build instructions will be added soon. The library distribution also comes with a simple console application which demonstrates the use of the \ndnrtcName{} library.
 
 \ndnrtcName{} builds on functionality from several third-party libraries with which it is linked. NDN-CPP \cite{ndnccl} is used for NDN connectivity. The WebRTC framework \cite{webrtc} is used in two ways: 1) incorporation of the existing video codec; 2) full incorporation of the existing WebRTC audio pipeline, including echo cancellation. OpenFEC \cite{openfec} is used for forward error correction support. 
 
@@ -512,9 +526,9 @@ The results of such testing influenced iterative updates to the design, two of w
 
 However, for previous library versions, the mechanism for buffering (see Figure \ref{fig:old-buf}) dictated the Interests' lifetime. In fact, in order to maintain the re-transmission checkpoint, all Interests entering the buffer had a lifetime equal to half of the current buffer size. This approach resulted in unavoidable Interest timeouts, in the cases when the consumer issued Interests far too early, before the actual data was produced.  This was further complicated by forwarding strategies in NFD that did not handle consumer-initiated retransmission over short periods. 
 
-For the current version of the library, the re-transmission checkpoint is placed at a time estimated to be the effective $RTT$ from the end of the buffer ($J=RTT$ on the Figure \ref{fig:old-buf}). This, together with an updated NFD re-transmission strategy \cite{nfd-rtx-release}, allows for larger Interests' lifetimes.
-
-
+For the current version of the library, the re-transmission checkpoint is placed at a time estimated to be the effective $RTT$ from the end of the buffer ($J=RTT$ on the Figure \ref{fig:old-buf}). This, together with an updated NFD re-transmission strategy \cite{nfd-rtx-release}, allows for larger Interests' lifetimes. 
+%% addressing review 60D-2, 60D-8
+In fact, current implementation does not rely on Interests' lifetimes anymore and every Interest is set to have 2000 ms lifetime.
 
 %%In the second sentence above, I changed it to until, but it was initially unless.
 
@@ -580,7 +594,10 @@ Other tests of multi-party conferencing ability included four peers, each publis
 This paper presents the design, implementation, and initial experimental evaluation of \ndnrtcName{}, a low-latency videoconferencing library built on Named Data Networking.   Our approach to this project has been experimentally driven so far, and has generated a functional low-latency streaming tool that we can now use a platform for exploring important design challenges in real-time media over NDN.  This is a rich area, and some of the future work that we have identified includes: 
 \begin{itemize}[label={}]
 
-\item \textbf{Adaptive rate control.} In the current design, the producer can choose to publish the same video stream at different bitrates, thus requiring the consuming user to manually select the best stream but laying the groundwork for adaptive rate control as a near-term effort. Such work will need to determine if monitoring of $d_arr$ and other approaches described above can address challenges of such adaptation over ICN, as suggested in papers such as \cite{posch2014client}.
+%% addressing reviews 60A-2, 60B-2, 60C-4, (60B-3, 60C-1)
+\item \textbf{Scalability tests.} \ndnrtcName{} has proven the viability of assumptions taken to implement low-latency media streaming over NDN. However, more well-established tests are needed to question the assumptions and explore the limits of scalability.
+
+\item \textbf{Adaptive rate control.} In the current design, the producer can choose to publish the same video stream at different bitrates, thus requiring the consuming user to manually select the best stream but laying the groundwork for adaptive rate control as a near-term effort. Such work will need to determine if monitoring of $d_{arr}$ and other approaches described above can address challenges of such adaptation over ICN, as suggested in papers such as \cite{posch2014client}.
 
 \item \textbf{Congestion control.} Congestion control algorithms and their impact on the receiver-driven design of \ndnrtcName{} are an open challenge that requires collaboration between application developers and architecture researchers. 
 
@@ -589,13 +606,16 @@ This paper presents the design, implementation, and initial experimental evaluat
 \item \textbf{Scalable video coding.} A more efficient way to relieve the producer from having to publish multiple copies of the same content at different bandwidths may be to use scalable video coding. By reflecting SVC layers in the namespace, the consumer will have more freedom for adapting media streams to the current network. Just as with audio, the SVC base layer may need to be prioritized. 
 
 \item \textbf{Encryption-based access control.} The current \ndnrtcName{} design supports basic content signing and verification. However, a prominent requirement of many types of videoconferencing is confidentiality, which we expect can be supported through encryption-based access control.  While it may appear that encryption could limit the gains offered by caching, recent work exploring that application of advanced cryptographic techniques such as attribute-based encryption to multimedia in ICN \cite{papanis2014use} suggest interesting new directions for balancing benefits of ICN with security requirements. 
-\end{itemize}
 %\item \textbf{Conference management} 
 %Work on ndncon. unknown but verified publishers trust; 
 %\end{itemize}
 %%signatures consistency checks for successive media packets 
 %% need to add the above before publication %%;  
 
+%% addressing review 60D-1
+\item \textbf{Inter-consumer sycnhronization.} The absence of direct consumer-producer coordination shifted the complexity of ``RTC-over-NDN" streaming to the consumer. Another related aspect of teleconferencing which was not covered by this work is to ensure media playback synchronism accross different consumers. Synchronization primitives that were designed in ChronoChat \cite{chronochat} may become a good starting point in addressing this issue.
+
+\end{itemize}
 
 \section{Acknowledgements}
 \label{sec:Acknowledgements}

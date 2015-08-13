@@ -16,8 +16,6 @@
 \usepackage{algpseudocode}
 \usepackage{enumitem}
 %\usepackage{pstricks}
-
-
 %\usepackage{authblk}  %% supported in class
 % \usepackage{float}
 % \newfloat{algorithm}{t}{lop}
@@ -29,8 +27,6 @@
 %% Shrink lists - http://tex.stackexchange.com/questions/43743/how-to-reduce-line-space-leading-within-an-enumerate-environment 
 \setenumerate{itemsep=-0.5ex,topsep=1ex, leftmargin=*}
 \setitemize{itemsep=-0.5ex,topsep=1ex, leftmargin=*}
-
-
 
 \title{\ndnrtcName{}: Real-time videoconferencing\\ over Named Data Networking}
 
@@ -44,6 +40,22 @@
        \email{jburke@remap.ucla.edu}
 }
 
+\newfont{\mycrnotice}{ptmr8t at 7pt}
+\newfont{\myconfname}{ptmri8t at 7pt}
+\let\crnotice\mycrnotice%
+\let\confname\myconfname%
+
+\permission{Permission to make digital or hard copies of all or part of this work for personal or classroom use is granted without fee provided that copies are not made or distributed for profit or commercial advantage and that copies bear this notice and the full citation on the first page. Copyrights for components of this work owned by others than the author(s) must be honored. Abstracting with credit is permitted. To copy otherwise, or republish, to post on servers or to redistribute to lists, requires prior specific permission and/or a fee. Request permissions from Permissions@acm.org.}
+\conferenceinfo{ICN'15,}{September 30--October 2, 2015, San Francisco, CA, USA. \\ 
+{\mycrnotice{Copyright is held by the owner/author(s). Publication rights licensed to ACM.}}}
+\copyrightetc{ACM \the\acmcopyr}
+\crdata{978-1-4503-3855-4/15/09\ ...\$15.00.\\
+DOI: http://dx.doi.org/10.1145/2810156.2810176}
+
+\clubpenalty=10000 
+\widowpenalty = 10000
+
+%************************************************
 \begin{document}
 
 \maketitle
@@ -75,6 +87,7 @@ The NDN project team uses application-driven research to explore NDN's affordanc
 
 A complete exploration of potential benefits for using NDN for real-time communication is outside the scope of this paper. Given that NDN proposes a general internet architecture, we are motivated on one hand by simply showing its viability for applications beyond the content distribution examples that are most often discussed in the literature.  However, we can briefly present a few potential benefits of using NDN for RTC that are exciting for us. 
 
+%% imo, any of the below assumption are not proven/confirmed with tests as for now. these are our expectations from NDN. if I was a reader, I would expect some confirmations of these later in the paper
 Over IP, low-latency audio/video conferencing applications typically establish direct sender-driven peer-to-peer communication channels for media. However,  existing solutions scale poorly to high numbers of producers and consumers without dedicated aggregation units. In these scenarios, they face implementation challenges and inefficiencies related to the connection-based approach currently used in most IP conferencing solutions.  Potential NDN benefits include: 1) By using names rather than IP addresses for routing and forwarding, as with any other NDN application, RTC applications stand to inherit the benefits for mobility, scalability, and simplifications of network infrastructure that are currently being researched.  2) Caching and per-packet verification, combined with broadcast or group encryption schemes where necessary, suggest that NDN could be highly efficient in supporting secure one-to-many or few-to-many low-latency broadcasts with very little additional application infrastructure - whether of entertainment content, presentations, closed-circuit cameras, computer vision sources, etc.  3) Receiver-driven applications with little or no publisher coordination can gain scalability in the network, as we have previously shown is viable in past work discussed below 4)  NDN opens up new possibilities for peer-to-peer RTC communication architectures that use both local and global channels efficiently.  5) Finally, because we are building protocols close to the thin waist of the NDN architecture, what is learned from exploring low-latency transmission of time series data here is beginning to provide directly applicable insight into handling other high rate  and/or low latency time series, such as sensor data feeds.  
 
 %************************************************

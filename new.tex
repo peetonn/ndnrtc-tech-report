@@ -21,7 +21,7 @@
 % \newfloat{algorithm}{t}{lop}
 
 \newcommand{\ndnrtcName}{NDN-RTC} % {\emph{ndnrtc}}
-\newcommand{\ndnconName}{NdnCon}
+\newcommand{\ndnconName}{ndncon}
 \newcommand{\wConcept}{Interest demand}
 
 %% Shrink lists - http://tex.stackexchange.com/questions/43743/how-to-reduce-line-space-leading-within-an-enumerate-environment 
@@ -131,9 +131,9 @@ Our design approach was further influenced by the relatively young state of NDN 
 
 \begin{itemize} 
 
-\item \textbf{Segment-level control.}  \ndnrtcName{} works directly with data segments rather than video frames, group-of-pictures (GOP) blocks, or other higher-level constructs.  This was done because interest-level metadata is piggy-backed to each segment and may be exploited by the consumer to adjust fetching behaviour. %(like RTT, total number of segments per frame, etc.).
-This was done because most approaches explored in current research do not handle deadline-driven playout, assume large buffer sizes relative to network latency variations, and because frame sizes often exceed current NDN data object maximum sizes.  
-While in the future, successful fetching and buffering patterns may be abstracted to a lower-level library, this approach enabled us to experiment with interest expression and buffering at fine granularity.  Note that where appropriate, application-level operations are indeed performed on frames, such as forward error correction based recovery. 
+\item \textbf{Segment-level control.}  \ndnrtcName{} works directly with data segments rather than video frames, group-of-pictures (GOP) blocks, or other higher-level constructs.  %(like RTT, total number of segments per frame, etc.).
+This was done because most approaches explored in current research do not handle deadline-driven playout, assume large buffer sizes relative to network latency variations, and because frame sizes often exceed current NDN data object maximum sizes. Interest-level metadata is piggy-backed to each segment and may be exploited by the consumer to adjust fetching behaviour. 
+While in the future, successful fetching and buffering patterns may be abstracted to a lower-level library, this approach enabled us to experiment with interest expression and buffering at fine granularity. %Note that where appropriate, application-level operations are indeed performed on frames, such as forward error correction based recovery. 
 
 \item \textbf{Assumptions about the network.}  We make a number of  assumptions about caching performance and other network behavior, presented throughout the paper. We understand that future networks may not behave in this manner, but test out the performance of simpler assumptions on the NDN testbed prior to trying more complex schemes.  
 
@@ -406,6 +406,18 @@ During bootstrapping, the consumer ``chases" the producer and aims to exhaust ne
 
 \textbf{Bootstrapping.} In current design, there are two experimentally determined indicators that are used by the consumer to adjust $\lambda$: effective $RTT$ ($RTT^\prime$) and inter-arrival delay $d_{arr})$. As described above, at bootstrapping (and re-acquisition), the consumer interprets $d_{arr}$ stabilization around a relatively constant period, that means that consumer receives the freshest data available from the network. However, it does not necessarily mean that the consumer issues Interests efficiently. Figure \ref{fig:ws10} shows that even though the consumer has exhausted cache rather quickly, $RTT^\prime$ is three times larger than the actual $RTT$ for the network (100ms), which means that the majority of the issued Interests remain pending while waiting for the requested data to be produced.
 
+\begin{figure}[t!]
+\centering
+%\captionsetup[subfigure]{aboveskip=-1pt,belowskip=-2pt}
+\begin{scriptsize}
+\subfigure[$\lambda=10$: short chasing, larger $RTT^\prime$]{\label{fig:ws10}\def\svgwidth{0.48\textwidth}\input{w10.pdf_tex}}
+\subfigure[$\lambda=4$: longer chasing, smaller $RTT^\prime$]{\label{fig:ws4}\def\svgwidth{0.48\textwidth}\input{w4.pdf_tex}}
+\subfigure[$\lambda=3$: consumer can't exhasut cache, $RTT^\prime = RTT$]{\label{fig:ws3}\def\svgwidth{0.48\textwidth}\input{w3.pdf_tex}}
+\end{scriptsize}
+\caption{Larger $\lambda$ decreases ``chasing" phase, but increases $RTT^\prime$ for the same network configuration ($RTT\approx100ms$)}
+\label{fig:ws}
+\end{figure}
+
 The consumer makes several iterative attempts to adjust $\lambda$ during bootstrapping, which can be described as follows:
 \begin{enumerate}
 \item The consumer initializes \wConcept{} with $\lambda_d$, and initiates Interests expression.
@@ -446,13 +458,20 @@ Over the course of \ndnrtcName{} development, we run numerous tests accross exis
 %During the course of \ndnrtcName{}'s initial development, 
 There were several  design iterations that each introduced improvements in the overall quality of experience for the end user, as well as in application efficiency in terms of bandwidth and computation. Each iteration tackled problems that were revealed during tests.  These motivated namespace, application packet format and other revisions, which are reflected in the design detailed above.% and described further in this section. 
 
-\subsection{Video streaming performance}
-A series of tests were conducted in order to assess bandwidth usage and perceived quality compared to Skype video calls. Each test was comprised of six runs of two-person, five-minute conference talks using \ndnconName{}, the graphical conferencing application built on top of \ndnrtcName{}: a) three runs of audio+video with low, medium and high video bandwidths settings (0.5, 0.7 and 1.5 Mbit/s accordingly); b) one run of audio-only conference; c) one run of Skype audio+video conference; d) one run of Skype audio-only conference. Tests were conducted across the existing NDN testbed, between the UCLA REMAP hub and six other hubs.  These tests covered both one-hop and multi-hop (with several intermediate hubs) paths. 
+\subsection{Streaming performance}
+%For the early versions of \ndnrtcName{} we've run multiple tests with 1 or more intermediate hubs in isolated testbed in order to achieve acceptable user experience for media streaming.
+
+\textbf{Separation of key and delta frame namespaces.} Video streaming performance in early versions of \ndnrtcName{} suffered from video ``hiccups", even when being tested on trivial one-hop topologies. The cause of this problem turned out to be an inefficient frame fetching process.
+ In early \ndnrtcName{} versions, the difference in size, and thus segments, of key frames and delta frames was not reflected in the producer's namespace and consumers were forced to issue equal number of initial Interests ($M$) regardless of the frame type. This resulted in additional round trips of missing Interests and, consequently, larger assembling times ($d_{asm}$) for key frames that eventually led to missed playout deadlines and ``hiccup" effects. Having a separate namespace for key frames enables consumers to maintain separate Interest pipelines per frame type and collect historical data on the average number of Interests required to retrieve one frame of each type in one round trip. 
+%A series of tests were conducted in order to assess bandwidth usage and perceived quality compared to Skype video calls. 
+
+\textbf{Audio samples bundling}
+Another set of tests targeting streaming performance was conducted over existing testbed with a number of volunteered NDN community members. Apart from monitoring app performance, we gathered user feedback and run similar tests with Skype. 
+Each test was comprised of six runs of two-person, five-minute conference talks using \ndnconName{}: a) three runs of audio+video with low, medium and high video bandwidths settings (0.5, 0.7 and 1.5 Mbit/s accordingly); b) one run of audio-only conference; c) one run of Skype audio+video conference; d) one run of Skype audio-only conference. Tests were conducted between the UCLA REMAP hub and six other hubs. These tests covered both one-hop and multi-hop paths. 
+As a main outcome of these tests, audio sample bundling was quickly introduced in \ndnrtcName{} to reduce audio bandwidth (and the number of Interests on the consumer side), making it comparable to Skype audio bandwidths. Figure \ref{fig:tests-skype} shows overall bitrate usage results before audio bundling was implemented. Whereas Skype has adapted to use link capacity between peers, and delivered higher bitrate videos, NdnCon did not adjust to the current network conditions which makes adaptive rate control features highly desirable as future work. We did not set comparison of performance and scalability between Skype and \ndnrtcName{} as our main goal and left it out for the future work. These kind of tests require clearly defined comparison framework between traditional and NDN low-latency applications.
 
 % Obvious - 
 %Actual average bitrates turned out to be slightly higher than pre-configured video streams -- 0.7, 0.9 and 1.8 Mbit/s for low, medium and high bandwidths respectively-- which can be explained by NDN packet overhead which is approximately 280-330 bytes and accounts for $\approx$30\% of the segment size (1000 bytes). 
-
-Figure \ref{fig:tests-skype} shows overall bitrate usage results. Whereas Skype has adapted to use link capacity between peers, and delivered higher bitrate videos, NdnCon did not adjust to the current network conditions which make adaptive rate control features highly desirable as future work. Early in these tests, audio sample bundling was quickly introduced in \ndnrtcName{} to reduce audio bandwidth (and the number of Interests on the consumer side), making it comparable to Skype audio bandwidths.
 
 % Obvious - 
 %
@@ -471,10 +490,7 @@ Figure \ref{fig:tests-skype} shows overall bitrate usage results. Whereas Skype 
 %The overall user experience for these 2-person conferences was subjectively assessed as being higher than average - 3 points on a scale from 0 to 5 (Skype calls were taken as 5-point user experiences).
 %%% I would not include this. 
 
-The results of such testing influenced iterative updates to the design, two of which are described below. 
-
-\textbf{Separation of key and delta frame namespaces.} Video streaming performance in early versions of \ndnrtcName{} suffered from video ``hiccups", even when being tested on trivial one-hop topologies. The cause of this problem turned out to be an inefficient frame fetching process.
- In early \ndnrtcName{} versions, the difference in size, and thus segments, of key frames and delta frames was not reflected in the producer's namespace and consumers were forced to issue equal number of initial Interests ($M$ on Figure \ref{fig:pull}) regardless of the frame type. This resulted in additional round trips of missing Interests and, consequently, larger assembling times ($d_{asm}$) for key frames that resulted in missed playout deadlines. Having a separate namespace for key frames enables consumers to maintain separate Interest pipelines per frame type and collect historical data on the average number of Interests required to retrieve one frame of each type in one round trip. 
+%The results of such testing influenced iterative updates to the design, two of which are described below. 
 
 %Increased assembling time quite often caused skipping incomplete key frames, as they were not assembled by the time they should have been played out. Eventually, all the subsequent delta frames were skipped as well, which degraded the overall video streaming experience by introducing the video ``hiccup" effect. 
 %%which made consumer to pipeline equal number of initial Interests--- this makes little sense to me, if any.
@@ -506,29 +522,21 @@ The results of such testing influenced iterative updates to the design, two of w
 %\label{fig:dgen}
 %\end{figure}
 
-\textbf{Bootstrap behavior.} In initial library versions based on the approach taken in NDNVideo, the consumer ``chased" the producer's time-series data by exhausting cached data via issuing a large number of outstanding Interests. However, there was no mechanism for the consumer to figure out when to issue those Interests and whether Interest expression should be postponed in order to reduce timeouts. For two similar test runs (one-hop topology), the number of timed out Interests and re-transmissions varied greatly (either $\approx$1\% or $\approx$50\%). One was due to an incorrect consumer's synchronization with the producer; Interests were issued too early, so they timed out before any data had been produced. This problem was addressed by increasing the Interests' lifetime. 
-
-However, for previous library versions, the mechanism for buffering (see Figure \ref{fig:old-buf}) dictated the Interests' lifetime. In fact, in order to maintain the re-transmission checkpoint, all Interests entering the buffer had a lifetime equal to half of the current buffer size. This approach resulted in unavoidable Interest timeouts, in the cases when the consumer issued Interests far too early, before the actual data was produced.  This was further complicated by forwarding strategies in NFD that did not handle consumer-initiated retransmission over short periods. 
-
-For the current version of the library, the re-transmission checkpoint is placed at a time estimated to be the effective $RTT$ from the end of the buffer ($J=RTT$ on the Figure \ref{fig:old-buf}). This, together with an updated NFD re-transmission strategy \cite{nfd-rtx-release}, allows for larger Interests' lifetimes. 
+\textbf{Bootstrap behavior.} In initial library versions based on the approach taken in NDNVideo, the consumer ``chased" the producer's time-series data by exhausting cached data via issuing a large number of outstanding Interests. However, there was no mechanism to dynamically adjust Interest expression. %the consumer to figure out when to issue those Interests and whether Interest expression should be postponed in order to reduce timeouts.
+For previous library versions, the buffering mechanism dictated the Interests' lifetime: all Interests entering the buffer had a lifetime equal to half of the current buffer size. Thus, it was expected that data will arrived before Interest times out. In cases when it does, Interest is re-issued and there's still half-buffer milliseconds left to receive data before playout deadline.
+However, this approach resulted in unavoidable Interest timeouts, in the cases when the consumer issued Interests far too early, before the actual data was produced.  This was further complicated by forwarding strategies in NFD that did not handle consumer-initiated retransmission over short periods. 
+For two similar test runs (one-hop topology), the number of timed out Interests and re-transmissions varied greatly (either $\approx$1\% or $\approx$50\%). %One was due to an incorrect consumer's synchronization with the producer; Interests were issued too early, so they timed out before any data had been produced. 
+This problem was addressed by increasing the Interests' lifetimes\footnote{In fact, the dependence on Interests' lifetimes is not required anymore and every Interest is set to have 2000 ms lifetime.} and introducing new NFD re-transmission strategy which allows early Interests re-transmissions. 
+Besides that, the re-transmission checkpoint is placed at a time estimated to be the effective $RTT$ from the end of the buffer ($J=RTT$ on the Figure \ref{fig:old-buf}) which reflects bears more accurate understanding of how data is received.
+% This, together with an updated NFD re-transmission strategy \cite{nfd-rtx-release}, allows for larger Interests' lifetimes. 
 %% addressing review 60D-2, 60D-8
-In fact, current implementation does not rely on Interests' lifetimes anymore and every Interest is set to have 2000 ms lifetime.
+%In fact, current implementation does not rely on Interests' lifetimes anymore and every Interest is set to have 2000 ms lifetime.
 
 %%In the second sentence above, I changed it to until, but it was initially unless.
 
-\begin{figure}[t!]
-\centering
-%\captionsetup[subfigure]{aboveskip=-1pt,belowskip=-2pt}
-\begin{scriptsize}
-\subfigure[$\lambda=10$: short chasing, larger $RTT^\prime$]{\label{fig:ws10}\def\svgwidth{0.48\textwidth}\input{w10.pdf_tex}}
-\subfigure[$\lambda=4$: longer chasing, smaller $RTT^\prime$]{\label{fig:ws4}\def\svgwidth{0.48\textwidth}\input{w4.pdf_tex}}
-\subfigure[$\lambda=3$: consumer can't exhasut cache, $RTT^\prime = RTT$]{\label{fig:ws3}\def\svgwidth{0.48\textwidth}\input{w3.pdf_tex}}
-\end{scriptsize}
-\caption{Larger $\lambda$ decreases ``chasing" phase, but increases $RTT^\prime$ for the same network configuration ($RTT\approx100ms$)}
-\label{fig:ws}
-\end{figure}
-
-Moreover, the problem described above can not occur if the consumer knows that it is issuing Interests too early. The chasing algorithm in older library versions was exhausting the network cache too aggressively; Interests were issued constantly until they filled up the buffer.  With the introduction of the $\lambda$ concept, the consumer has more useful control of the Interest expression. Figure \ref{fig:ws} shows how a larger value of $\lambda$ helps to exhaust the cache more quickly. The number of outstanding Interests is controlled by a consumer and directly influences how fast consumer can ``chase" the producer. Thus, the consumer can control the ``agressiveness" of cache exhaustion.
+Moreover, the problem described above can not occur if the consumer knows that it is issuing Interests too early. The chasing algorithm in older library versions was exhausting the network cache too aggressively; Interests were issued constantly until they filled up the buffer.  With the introduction of the $\lambda$ concept, the consumer has more useful control of the Interest expression. 
+%Figure \ref{fig:ws} shows how a larger value of $\lambda$ helps to exhaust the cache more quickly. 
+The number of outstanding Interests is controlled by a consumer and directly influences how fast consumer can ``chase" the producer. Thus, the consumer is able to control the ``agressiveness" of cache exhaustion and achieve better synchronization state with the producer.
 %% PG: removed these sentences as they duplicate "Interest expression control" section
 %The $\lambda$ concept allows a ``lazy" start for the consumer. By specifying a smaller $\lambda$, the consumer issues less Interests. Further, the consumer observes cache exhaustion by monitoring $d_{arr}$ and, if the cache has not been exhausted during allocated time, the consumer may increase the value of $\lambda$ in order to express more Interests. Similarly, the consumer may opt to decrease $\lambda$ in cases where the original value resulted in behaviour that is too aggressive.
 
@@ -580,7 +588,7 @@ This paper presents the design, implementation, and initial experimental evaluat
 \begin{itemize}[label={}]
 
 %% addressing reviews 60A-2, 60B-2, 60C-4, (60B-3, 60C-1)
-\item \textbf{Scalability tests.} \ndnrtcName{} has shown that real-time communication using NDN is viable with the current open source implementation and on the current NDN testbed;  we are in the process of evaluating its performance in a variety of traffic and path scenarios. Both appropriate schemes for determining the ``latest data'' the network can provide at the correct rate and approaches to congestion control algorithms are an open challenge that requires collaboration between application developers,  architecture researchers, and testbed operators.  
+\item \textbf{Scalability tests.} \ndnrtcName{} has shown that real-time communication using NDN is viable with the current open source implementation and on the current NDN testbed;  we are in the process of evaluating its performance in a variety of traffic and path scenarios. Both appropriate schemes for determining the ``latest data'' the network can provide at the correct rate and approaches to congestion control algorithms are an open challenge that requires collaboration between application developers,  architecture researchers, and testbed operators. Our assumptions about the Interests and Data delivery patterns were emerged from empirical observations of network behavior and may require more thorough experimentation approach in multi-peer scenarios. We also acknowledge the need in wider scalability testing compared to existing IP solutions. Our intuitive understanding and initial test results suggest that large-scale performance should be supported by NDN architecture inherently while delivering same QoS as the existing solutions.
 
 \item \textbf{Adaptive rate control.} In the current design, the producer can choose to publish the same video stream at different bitrates, thus requiring the consuming user to manually select the best stream but laying the groundwork for adaptive rate control as a near-term effort. Such work will need to determine if monitoring of $d_{arr}$ and other approaches described above can address challenges of such adaptation over ICN, as suggested in papers such as \cite{posch2014client}.  We are currently in the process of co-developing an adaptative rate control solution. 
 

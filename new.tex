@@ -28,7 +28,7 @@
 \setenumerate{itemsep=-0.5ex,topsep=1ex, leftmargin=*}
 \setitemize{itemsep=-0.5ex,topsep=1ex, leftmargin=*}
 
-\title{\ndnrtcName{}: Real-time videoconferencing\\ over Named Data Networking}
+\title{\ndnrtcName{}: Real-Time Videoconferencing\\ over Named Data Networking}
 
 \numberofauthors{2}
 \author{
@@ -136,7 +136,7 @@ Our design approach was further influenced by the relatively young state of NDN 
 This choice was made because most abstractions for most Interest-Data exchange explored in current research and available implementations do not handle low-latency, deadline-driven playout, assume large buffer sizes relative to network latency variations, and because frame sizes often exceed current NDN data object maximum sizes. 
 While in the future, successful fetching and buffering patterns may be abstracted to a lower-level library, this approach enabled us to experiment with Interest expression and buffering at fine granularity. For example, \ndnrtcName{} uses per segment metadata that can be exploited by the consumer to adjust fetching behavior. %Note that where appropriate, application-level operations are indeed performed on frames, such as forward error correction based recovery. 
 
-\item \textbf{Assumptions about the network.}  Throughout the paper are a number of assumptions about caching performance and other network behavior. Although future networks may have more complex behavior, the intention here is to explore the performance of basic assumptions on the NDN testbed, rather than proposing schemes to address the emergent behavior of complex ICN networks.
+\item \textbf{Assumptions about the network.}  Throughout the paper there are a number of assumptions about caching performance and other network behavior. Although future networks may have more complex behavior, the intention here is to explore the performance of basic assumptions on the NDN testbed, rather than proposing schemes to address the emergent behavior of complex ICN networks.
 
 \end{itemize}
 
@@ -353,7 +353,7 @@ A similar process is used for fetching audio, though for now, audio bundles are 
 % 	- assembling frames
 % - buffer-based retransmissions
 
-The consumer uses a \textit{jitter buffer} to manage out-of-order data arrivals and variations in network delay, and as a place to assemble segments into frames (see Figure \ref{fig:old-buf}). %However, the role of such a buffer  has some NDN-specific aspects. In sender-driven video delivery, buffer slots can be allocated per segment using sequential numbering. 
+The consumer uses a \textit{jitter buffer} to manage out-of-order data arrivals and variations in network delay, and as a place to assemble segments into frames. % (see Figure \ref{fig:old-buf}). %However, the role of such a buffer  has some NDN-specific aspects. In sender-driven video delivery, buffer slots can be allocated per segment using sequential numbering. 
 Our receiver-based paradigm requires the consumer to request data by name explicitly, and organize it by frame as well as segment. %Therefore, after expressing an Interest, the consumer ``knows" that new data is coming, and a named frame slot can be reserved in the buffer, though the number of segments is not known. Practically, this means that there will always be some number of reserved empty slots in the buffer. 
 Outstanding Interests are represented in the buffer by ``reserved slots" - those that have partial frame data or no data at all.
 The \ndnrtcName{} jitter buffer's size is expressed in terms of two values measured in milliseconds at any given point in time. Its \textit{playback size} is the playback duration in milliseconds of all complete ordered frames; its \textit{estimated size} is \textit{playback size} + \textit{number of reserved slots} $\times$ 1/\textit{producer rate}, which reflects the estimated size of the buffer when all reserved slots have data. Each frame-level slot has an associated set of interests. 
@@ -364,7 +364,7 @@ The difference between estimated buffer size and playback size corresponds to th
 %% Correct formatting for($RTT^{\prime}$)?
 
 Playout progress of the jitter buffer is used for retransmission control. %As shown in Figure \ref{fig:old-buf}, 
-At $J$ milliseconds from the buffer end there is a checkpoint, after which it is estimated to be too late for another round trip. When a frame reaches the checkpoint, it is checked for completeness. If the frame is incomplete and cannot be recovered using available parity data, Interests for the missing segments are re-issued. 
+At $J$ milliseconds from the buffer end (see Figure \ref{fig:old-buf}) there is a checkpoint, after which it is estimated to be too late for another round trip. When a frame reaches the checkpoint, it is checked for completeness. If the frame is incomplete and cannot be recovered using available parity data, Interests for the missing segments are re-issued. 
 
 \subsubsection{Interest expression control}
 
@@ -407,7 +407,7 @@ During bootstrapping, the consumer ``chases" the producer and aims to exhaust ne
 \label{fig:w-concept}
 \end{figure}
 
-\textbf{Bootstrapping.} In the current design, there are two experimentally determined indicators that are used by the consumer to adjust $\lambda$: effective $RTT$ ($RTT^\prime$) and inter-arrival delay $d_{arr})$. As described above, at bootstrapping (and re-acquisition), the consumer interprets $d_{arr}$ stabilization around a relatively constant period, in order for the consumer to receive the freshest data available from the network. However, this does not necessarily ensure that the consumer issues Interests efficiently. Figure \ref{fig:ws10} displays that although the consumer has exhausted the cache rather quickly, $RTT^\prime$ is three times larger than the actual $RTT$ for the network (100ms), which means that the majority of the issued Interests remain pending while waiting for the requested data to be produced.
+\textbf{Bootstrapping.} In the current design, there are two experimentally determined indicators that are used by the consumer to adjust $\lambda$: effective $RTT$ ($RTT^\prime$) and inter-arrival delay $d_{arr}$. As described above, at bootstrapping (and re-acquisition), the consumer interprets $d_{arr}$ stabilization around a relatively constant period, in order for the consumer to receive the freshest data available from the network. However, this does not necessarily ensure that the consumer issues Interests efficiently. Figure \ref{fig:ws10} displays that although the consumer has exhausted the cache rather quickly, $RTT^\prime$ is three times larger than the actual $RTT$ for the network (100ms), which means that the majority of the issued Interests remain pending while waiting for the requested data to be produced.
 
 \begin{figure}[t!]
 \centering
@@ -525,7 +525,7 @@ As a main outcome of these tests, audio sample bundling was quickly introduced i
 %\end{figure}
 
 \textbf{Bootstrap behavior.} In initial library versions based on the approach taken in NDNVideo, the consumer ``chased" the producer's time-series data by exhausting cached data via issuing a large number of outstanding Interests. However, there was no mechanism to adjust Interest expression dynamically; 
-the buffering mechanism dictated the Interests' lifetime: All Interests entering the buffer had a lifetime equal to half of the current buffer size. Thus, it was expected that data will arrive before the Interest times out. In these cases, the Interest is re-issued, even with a half-buffer length remaining  to receive data before the playout deadline. This approach resulted in unavoidable Interest timeouts, in the cases when the consumer issued Interests far too early, before the actual data was produced.  This was further complicated by forwarding strategies in the NDN Forwarding Daemon (NFD) that did not handle consumer-initiated retransmission over short periods. 
+the buffering mechanism dictated the Interests' lifetime: all Interests entering the buffer had a lifetime equal to half of the current buffer size. Thus, it was expected that data will arrive before the Interest times out. In these cases, the Interest is re-issued, even with a half-buffer length remaining  to receive data before the playout deadline. This approach resulted in unavoidable Interest timeouts, in the cases when the consumer issued Interests far too early, before the actual data was produced.  This was further complicated by forwarding strategies in the NDN Forwarding Daemon (NFD) that did not handle consumer-initiated retransmission over short periods. 
 For two similar test runs (one-hop topology), the number of timed out Interests and re-transmissions varied greatly (either $\approx$1\% or $\approx$50\%). %One was due to an incorrect consumer's synchronization with the producer; Interests were issued too early, so they timed out before any data had been produced. 
 This problem was addressed by increasing the Interests' lifetimes\footnote{In fact, the dependence on Interests' lifetimes is not required anymore and every Interest is set to have 2000 ms lifetime.} and the introduction of a new NFD re-transmission strategy that allowed early Interests re-transmissions. 
 Additionally, the re-transmission checkpoint is now placed at a time estimated to be the effective $RTT$ from the end of the buffer ($J=RTT$ on the Figure \ref{fig:old-buf}), which reflects a more accurate understanding of how data is received.

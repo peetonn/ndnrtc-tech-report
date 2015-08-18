@@ -24,6 +24,9 @@
 \newcommand{\ndnconName}{\emph{ndncon}}
 \newcommand{\wConcept}{Interest demand}
 
+\clubpenalty=10000 
+\widowpenalty = 10000
+
 %% Shrink lists - http://tex.stackexchange.com/questions/43743/how-to-reduce-line-space-leading-within-an-enumerate-environment 
 \setenumerate{itemsep=-0.5ex,topsep=1ex, leftmargin=*}
 \setitemize{itemsep=-0.5ex,topsep=1ex, leftmargin=*}
@@ -322,7 +325,7 @@ The consumer implements Interest pipelining and data buffering, as shown in Figu
 %The consumer obtains the number of segments per frame from metadata in the received segment; however, to minimize latency, it  issues a pipeline of Interests simultaneously. 
 The consumer uses an estimate of the number of segments it must fetch for a given frame, issuing $M$ initial Interests, as illustrated in Figure \ref{fig:pull}. If Interests arrive too early, they will be held in the producer's PIT and stay there until the frame is captured and packetized. The delay between Interest arrival and availability of the media data is called the \textbf{generation delay}, $d_{gen}$. Conceptually, this interval should be kept low, to avoid accumulating outstanding Interests with short lifetimes; however,  Interests should not arrive after data is published, as this increases latency from the end-user's perspective.  Once the encoded frame is segmented into $N$ segments and published, Interests $0 - M$ are answered, and the Data returns to the requestor(s). 
 
-Upon receiving the first Data segment, the consumer knows from the metadata the exact number of segments $N$ for the current frame, and issues $N - M$ more Interests for the missing segments, if any. These segments will be satisfied by data with no generation delay, as the frame has been published already by the producer. The time interval between receiving the very first segment and when the frame is fully assembled is represented by $d_{asm}$ and called \textbf{assembly time}. Note that for frames that have less segments than the estimate, some Interests may go unanswered.%; this is currently a tradeoff made to try to keep latency low for the frame as a whole. %These Interests have low lifetimes, of about 300ms. 
+Upon receiving the first Data segment, the consumer knows from the metadata the exact number of segments $N$ for the current frame, and issues $N - M$ more Interests for the missing segments, if any. These segments will be satisfied by data with no generation delay, as the frame has been published already by the producer. The time interval between receiving the very first segment and when the frame is fully assembled is represented by $d_{asm}$ and called \textbf{assembly time}. Note that for frames that have less segments than the estimate ($N < M$), some Interests may go unanswered.%; this is currently a tradeoff made to try to keep latency low for the frame as a whole. %These Interests have low lifetimes, of about 300ms. 
  
 
 \begin{figure}[t!]
@@ -470,7 +473,7 @@ There were several design iterations, and each introduced improvements in the ov
 \textbf{Audio sample bundling.}
 Another set of tests targeting streaming performance was conducted over the existing testbed with a number of volunteers from the NDN community. Apart from monitoring application performance, we gathered user feedback and compared the experience with Skype. 
 Each test was comprised of six runs of two-person, five-minute conference calls using \ndnconName{}: a) three runs of audio+video with low, medium and high video bandwidths settings (0.5, 0.7 and 1.5 Mbit/s accordingly); b) one run of audio-only conference; c) one run of Skype audio+video conference; d) one run of Skype audio-only conference. Tests were conducted between the UCLA REMAP hub and six other hubs. These tests covered both one-hop and multi-hop paths. 
-As a main outcome of these tests, audio sample bundling was quickly introduced in \ndnrtcName{} to reduce audio bandwidth (and the number of Interests on the consumer side), making it comparable to Skype audio bandwidths. Figure \ref{fig:tests-skype} shows overall bitrate usage results before audio bundling was implemented. As expected, Skype adapted to use link capacity between peers, and delivered higher bitrate videos; leaving such adaptive rate control as our highest priority future work. %We did not set comparison of performance and scalability between Skype and \ndnrtcName{} as our main goal and left it out for the future work. These kind of tests require clearly defined comparison framework between traditional and NDN low-latency applications.
+As a main outcome of these tests, audio sample bundling was quickly introduced in \ndnrtcName{} to reduce audio bandwidth (and the number of Interests on the consumer side), making it comparable to Skype audio bandwidths.\footnote{Currently, 5 audio samples are bundled together into one segment.} Figure \ref{fig:tests-skype} shows overall bitrate usage results before audio bundling was implemented. As expected, Skype adapted to use link capacity between peers, and delivered higher bitrate videos; leaving such adaptive rate control as our highest priority future work. %We did not set comparison of performance and scalability between Skype and \ndnrtcName{} as our main goal and left it out for the future work. These kind of tests require clearly defined comparison framework between traditional and NDN low-latency applications.
 
 % Obvious - 
 %Actual average bitrates turned out to be slightly higher than pre-configured video streams -- 0.7, 0.9 and 1.8 Mbit/s for low, medium and high bandwidths respectively-- which can be explained by NDN packet overhead which is approximately 280-330 bytes and accounts for $\approx$30\% of the segment size (1000 bytes). 
@@ -500,7 +503,6 @@ As a main outcome of these tests, audio sample bundling was quickly introduced i
 
 %\subsection{Quality of experience}
 % PG: moved figure to the previous section
-
 
 \subsection{Consumer-Producer synchronization}
 
